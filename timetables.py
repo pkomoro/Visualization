@@ -1,43 +1,30 @@
 import pandas as pd
+import numpy as np
 
 import matplotlib.pyplot as plt
 
-def visualize_timetable(data, title="Timetable"):
-    """
-    Visualize a timetable using a heatmap.
-
-    Parameters:
-        data (pd.DataFrame): A pandas DataFrame where rows represent time slots
-                             and columns represent days, with values indicating
-                             activity or occupancy.
-        title (str): Title of the timetable visualization.
-    """
-    plt.figure(figsize=(10, 6))
-    plt.title(title, fontsize=16)
-    plt.xlabel("Days", fontsize=12)
-    plt.ylabel("Time Slots", fontsize=12)
-    plt.xticks(rotation=45)
-
-    # Create a heatmap
-    plt.imshow(data, cmap="coolwarm", aspect="auto")
-    plt.colorbar(label="Activity/Occupancy")
-    plt.xticks(range(len(data.columns)), data.columns)
-    plt.yticks(range(len(data.index)), data.index)
-
-    plt.tight_layout()
-    plt.show()
+def plot_last_column(file_path):
+    # Import the file with semicolon-separated values
+    data = pd.read_csv(file_path, sep=';')
+    
+    # Ensure there is at least one column
+    if data.shape[1] < 1:
+        print("The file does not contain enough columns.")
+        return
+    
+    # Plot the last column as a function of the index
+    last_column_name = data.columns[-1]
+    ydata = data[last_column_name]
+    plt.plot(data.index, ydata)
+    plt.yticks = np.arange(min(data[last_column_name]), max(data[last_column_name]), 0.1)
+    plt.xlabel('Time [s]')
+    plt.ylabel('Voltage [V]')
+    # plt.show()
+    plt.savefig(file_path + '.png')
 
 # Example usage
 if __name__ == "__main__":
-    # Example data
-    # Load timetable data from an external file
-    path = "C:/Users/komor/OneDrive - Wojskowa Akademia Techniczna/Pomiary/Photomixing/"
-    datafile = "stability_100GHz"
-    timetable_data = pd.read_csv(path+datafile, index_col=0)
+    # Make sure to adjust the path according to your file location
 
-    print(timetable_data)
-
-    time_slots = ["8:00-9:00", "9:00-10:00", "10:00-11:00", "11:00-12:00", "12:00-1:00"]
-    df = pd.DataFrame(timetable_data, index=time_slots)
-
-    visualize_timetable(df, title="Weekly Timetable")
+    path = 'C:/Users/komor/OneDrive - Wojskowa Akademia Techniczna/Pomiary/Photomixing/stability_1400GHz'
+    plot_last_column(path)
