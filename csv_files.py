@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 
-from methods import plot_columns_from_line
+from methods import plot_columns_from_line, plot_selected_columns
 
 import matplotlib.pyplot as plt
 
@@ -15,9 +15,14 @@ if __name__ == "__main__":
     path = 'path'
     # Filter only CSV files from the directory
     files = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('.csv')]
-    print(files)
+
+    
+    # Filter files containing a specific word in their names
+    keyword = 'Oscy'
+    files = [file for file in files if keyword in os.path.basename(file)]
 
     # Execute the plot_last_column function on each file
     for file in files:
-        plot_columns_from_line(file,18)
+        plot_selected_columns(file, 3, [1])
+        
     
