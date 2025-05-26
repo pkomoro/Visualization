@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 
-from methods import plot_columns_from_line, plot_selected_columns
+from methods import plot_columns_from_line, plot_selected_columns, plot_eye_diagram
 
 import matplotlib.pyplot as plt
 
@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 # Example usage
 if __name__ == "__main__":
-    # Make sure to adjust the path according to your file location
+    # Make sure to adjust the path according to your file location - use "/"
     # Get all files from the specified directory
     path = 'path'
     # Filter only CSV files from the directory
@@ -18,11 +18,12 @@ if __name__ == "__main__":
 
     
     # Filter files containing a specific word in their names
-    keyword = 'Oscy'
+    keyword = '2'
     files = [file for file in files if keyword in os.path.basename(file)]
 
     # Execute the plot_last_column function on each file
     for file in files:
-        plot_selected_columns(file, 3, [1])
+        # plot_selected_columns(file, 3, [1])
+        plot_eye_diagram(file, 3, [1], 3000)
         
     

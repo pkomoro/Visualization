@@ -76,3 +76,33 @@ def plot_selected_columns(file_path, start_line, columns_to_plot):
     # plt.legend()
     plt.savefig(file_path + '_selected_columns_plot.png', dpi = 300, bbox_inches='tight')
     plt.close()
+
+
+def plot_eye_diagram(file_path, start_line, column_to_plot, points_per_interval):
+    """
+    Plots an eye diagram from a specified column of a CSV file.
+
+    Parameters:
+    - file_path: str, path to the CSV file.
+    - start_line: int, number of lines to skip before reading the file.
+    - column_to_plot: int, index of the column to plot.
+    - points_per_interval: int, number of points per interval for the eye diagram.
+    """
+    # Import the file with semicolon-separated values, skipping rows before start_line
+    data = pd.read_csv(file_path, skiprows=start_line, sep=',')
+    
+       
+    # Extract the data for the specified column
+    ydata = data.iloc[:, column_to_plot]
+    
+    # Split the data into intervals of the specified number of points
+    num_intervals = len(ydata) // points_per_interval
+    for i in range(num_intervals):
+        interval_data = ydata[i * points_per_interval:(i + 1) * points_per_interval]
+        plt.plot(range(points_per_interval), interval_data, alpha=0.5)  # Add transparency for overlapping lines
+    
+    plt.xlabel('Sample Index')
+    plt.ylabel('Signal [V]')
+    plt.title('Eye Diagram')
+    plt.savefig(file_path + '_eye_diagram.png', dpi=300, bbox_inches='tight')
+    plt.close()
