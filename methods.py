@@ -24,6 +24,34 @@ def plot_last_column(file_path):
     plt.savefig(file_path + '.png')
     plt.close()
 
+
+def plot_last_column_TSV(file_path):
+    # Import the file with tab-separated values (for .txt files)
+    data = pd.read_csv(file_path, sep='\t')
+    
+    # Ensure there is at least one column
+    if data.shape[1] < 1:
+        print("The file does not contain enough columns.")
+        return
+    
+    # Plot the last column as a function of the index
+    last_column_name = data.columns[-1]
+    ydata = data[last_column_name]
+
+    xdata = data.iloc[:, 0]
+
+    plt.plot(xdata, ydata)
+    plt.yticks(np.arange(min(ydata), max(ydata), 0.1))
+    plt.xlabel('Angle [degrees]')
+    plt.ylabel('Voltage [V]')
+    plt.axhline(y=np.max(ydata)/2, color='g', linestyle='--')
+    plt.axvline(x=15, color='r', linestyle='--')
+    plt.axvline(x=2.6, color='b', linestyle='--')
+    plt.axvline(x=23.1, color='b', linestyle='--')
+    plt.savefig(file_path + '.jpg')
+    plt.close()
+
+
 def plot_columns_from_line(file_path, start_line):
     # Import the file with semicolon-separated values, skipping rows before start_line
     data = pd.read_csv(file_path, skiprows=start_line)
