@@ -42,9 +42,6 @@ plt.xlabel('Frequency [GHz]')
 plt.ylabel('Sensitivity [a.u.]')
 plt.title('Relative Sensitivity vs Frequency')
 plt.grid(True)
-
-plt.show()
-
 plt.savefig(path + '\\sensitivity_plot.jpg', dpi=500, bbox_inches='tight')
 
 # Filter data for 200-300 GHz range
