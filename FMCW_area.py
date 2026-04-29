@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Specify your path here
-path = r'C:\Users\komor\OneDrive - Wojskowa Akademia Techniczna\Pomiary\Zachary Taylor\FMCW - pomiary wstępne\12.03.2026\Area scans'
+path = r'C:\Users\komor\OneDrive - Wojskowa Akademia Techniczna\Pomiary\Zachary Taylor\FMCW - pomiary wstępne\19.03.2026\Area scans'
 script_dir = Path(path)
 
 
