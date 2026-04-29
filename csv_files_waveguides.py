@@ -95,14 +95,18 @@ if __name__ == "__main__":
         # y, x = np.meshgrid[xs_data, ys_data]
 
         fig2,ax2 = plt.subplots(figsize=(8,6))
-        mesh2 = ax2.pcolormesh(xs_data, ys_data, img, cmap='jet', shading='auto')
+        mesh2 = ax2.pcolormesh(xs_data*1000, ys_data*1000, img**2, cmap='inferno', shading='auto')
         cbar2 = fig2.colorbar(mesh2, ax=ax2)
-        cbar2.set_label("Rozkład pola",fontsize=12)
+        cbar2.set_label("Intensity [a.u.",fontsize=12)
         ax2.set_aspect("equal")
-        ax2.set_xlabel('Oś X [µm]', fontsize=12)
-        ax2.set_ylabel('Oś Y [µm]', fontsize=12)
+        ax2.set_xlabel('x [mm]', fontsize=12)
+        ax2.set_ylabel('y [mm]', fontsize=12)
+        zoom_factor = 5
+        ax2.set_xlim(xs_data.min()*1000 / zoom_factor, xs_data.max()*1000 / zoom_factor)
+        ax2.set_ylim(ys_data.min()*1000 / zoom_factor, ys_data.max()*1000 / zoom_factor)
+
         plt.tight_layout()
-        plt.savefig(os.path.join(path, f"plot_{os.path.basename(f).replace('.csv', '.jpg')}"), dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(path, f"plot_{os.path.basename(f).replace('.csv', '.jpg')}"), dpi=1000, bbox_inches='tight')
         
 
 
