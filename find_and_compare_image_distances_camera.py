@@ -7,7 +7,7 @@ import re
 if __name__ == "__main__":
 
 
-    focal_length = 118  # mm, adjust based on your lens
+    focal_length = 180  # mm, adjust based on your lens
 
     total_distance_map = {
         118: 320,
@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     # print(*paths, sep='\n')
 
-    ploting = True
+    ploting = False
 
     l = 3.21  # mm, wavelength of the beam
     w0 = 7.04  # mm, beam waist radius
@@ -61,10 +61,12 @@ if __name__ == "__main__":
     ax.set_facecolor('black')
 
     radii = [np.zeros(len(data[i])) for i in range(len(data))]
-    radii2 = [np.zeros(len(data[i])) for i in range(len(data))]
+    max_intensity = [np.zeros(len(data[i])) for i in range(len(data))]
     distances = [np.zeros(len(data[i])) for i in range(len(data))]
 
     image_positions = [0 for i in range(len(data))]
+    image_positions2 = [0 for i in range(len(data))]
+    image_positions3 = [0 for i in range(len(data))]
     object_positions = [0 for i in range(len(data))]
 
     for j in range(len(paths)):
@@ -140,7 +142,7 @@ if __name__ == "__main__":
         for k in range(len(data[j])):           
             threshold = 1/np.e**2 * np.max(data[j][k])
             radii[j][k] = np.sqrt(np.sum(data[j][k] > threshold) * 2.25 / np.pi)
-            radii2[j][k] = np.sqrt(np.sum(data[j][k] > threshold) * 2.25 / np.pi)
+            max_intensity[j][k] = np.max(data[j][k])
         
         if ploting:
             plt.savefig(paths[j] + '_xz_y' + str(y) + 'px.jpg', dpi = 300, bbox_inches='tight')
@@ -156,7 +158,8 @@ if __name__ == "__main__":
         # angle_deg = np.degrees(np.arctan(coefficients[0]))
 
         image_positions[j] = distances[j][np.argmin(fitted_radii)]
-        
+        image_positions2[j] = distances[j][np.argmin(radii[j])]
+        image_positions3[j] = distances[j][np.argmax(max_intensity[j])]
 
         
         if ploting:
@@ -218,8 +221,9 @@ if __name__ == "__main__":
         return U
 
     plt.figure(figsize=(10, 6))
-    plt.plot(object_positions, image_positions, 'o-', label='Experimental', linewidth=2, markersize=8)
-
+    plt.plot(object_positions, image_positions, 'o', label='Experimental (fit)', linewidth=2, markersize=8)
+    plt.plot(object_positions, image_positions2, 'x', label='Experimental (min radius)', linewidth=2, markersize=8)
+    plt.plot(object_positions, image_positions3, '+', label='Experimental (max intensity)', linewidth=2, markersize=8)
     object_distances = np.linspace(np.min(object_positions), np.max(object_positions), 100)  # mm, range of object distances to consider
 
     for focal_length_scale in np.linspace(0.97, 0.99, 3):  # Adjust this scale factor as needed to better match the experimental data
