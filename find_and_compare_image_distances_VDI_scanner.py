@@ -16,12 +16,18 @@ if __name__ == "__main__":
 
     focal_length = 180  # mm, adjust based on your lens
 
+    basic_lens_distance = 210  # mm, z axis position of the lens when d=0 (object at the lens)
+
+    lens_thickness = 8  # mm, thickness of the lens
+
+    relative_point_source_position = 0  # mm, point source position relative to horn antenna
+
     total_distance_map = {
-        118: 320,
+        118: 330,
         158: 480,
         180: 570
     }
-    total_distance = total_distance_map.get(focal_length, 570)  # default to 570 mm if focal length not found
+    total_distance = total_distance_map.get(focal_length, 870)  # default to 870 mm if focal length not found
 
     # List all .txt files from path starting with "f" followed by the focal length and ending with .txt
     txt_files = [f for f in os.listdir(path) if f.startswith('f'+ str(focal_length)) and f.endswith('.txt')]
@@ -63,7 +69,7 @@ if __name__ == "__main__":
         base_name = os.path.splitext(txt_file)[0]
         d_match = re.search(r'd(\d+)', base_name)
         if d_match:
-            d_value = int(d_match.group(1))
+            d_value = int(d_match.group(1)) - basic_lens_distance - relative_point_source_position  # Adjust d value based on the basic lens distance
             d_values.append(d_value)
             max_args.append(arg_at_max)
             max_args_fit.append(col3.iloc[np.argmax(fitted_values)])
@@ -93,13 +99,14 @@ if __name__ == "__main__":
     if d_values:
         # Sort by d values for a clean plot
         sorted_indices = np.argsort(d_values)
-        d_sorted = np.array(d_values)[sorted_indices] - total_distance + focal_length
-        args_sorted = total_distance - d_sorted + np.array(max_args)[sorted_indices]
-        args_fit_sorted = total_distance - d_sorted + np.array(max_args_fit)[sorted_indices]
+        d_sorted = np.array(d_values)[sorted_indices]
+        args_sorted = total_distance + lens_thickness - d_sorted + np.array(max_args)[sorted_indices]
+        args_fit_sorted = total_distance + lens_thickness - d_sorted + np.array(max_args_fit)[sorted_indices]
 
         plt.figure()
         plt.plot(d_sorted, args_sorted, marker='o', linestyle='-', label='Actual Maximum')
         plt.plot(d_sorted, args_fit_sorted, marker='s', linestyle='--', label='Fitted Maximum')
+        plt.ylim(200, 900)
         plt.xlabel('Object position [mm]')
         plt.ylabel('Image position [mm]')
         plt.title('Image vs Object Position for Focal Length ' + str(focal_length) + 'mm')
@@ -111,15 +118,27 @@ if __name__ == "__main__":
         max_values_fit_sorted = np.array(max_values_fit)[sorted_indices]
         ax_left = plt.gca()
         ax_right = ax_left.twinx()
-        ax_right.plot(d_sorted, 50 * max_values_sorted, marker='^', color='C2', linestyle='-', label='Max Power')
-        ax_right.plot(d_sorted, 50 * max_values_fit_sorted, marker='v', color='C2', linestyle='--', label='Fitted Max Power')
+        ax_right.plot(d_sorted, 20 * max_values_sorted, marker='^', color='C2', linestyle='-', label='Max Power')
+        ax_right.plot(d_sorted, 20 * max_values_fit_sorted, marker='v', color='C2', linestyle='--', label='Fitted Max Power')
         ax_right.set_ylabel('Max Power [mW]', color='C2')
         ax_right.tick_params(axis='y', labelcolor='C2')
+        ax_right.set_ylim(10,45)  # Set y-axis limit for power
+        
+        # draw dashed lines at 2*focal_length on both axes
+        ax_left.axvline(2 * focal_length, color='gray', linestyle='--', linewidth=1)
+        ax_left.axhline(2 * focal_length, color='gray', linestyle='--', linewidth=1)
+        # label the 2f lines on the bottom and left axes
+        xlim = ax_left.get_xlim()
+        ylim = ax_left.get_ylim()
+        ax_left.text(2 * focal_length, ylim[0], ' 2f', color='gray', ha='left', va='bottom')
+        ax_left.text(xlim[0], 2 * focal_length, ' 2f', color='gray', ha='left', va='bottom')
+
         
         # combine legends
         lines_left, labels_left = ax_left.get_legend_handles_labels()
         lines_right, labels_right = ax_right.get_legend_handles_labels()
         ax_left.legend(lines_left + lines_right, labels_left + labels_right, loc='best')
+
         
         
 
