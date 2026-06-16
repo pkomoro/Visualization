@@ -2,12 +2,26 @@ import pandas as pd
 import numpy as np
 import os
 import re
-
 import matplotlib.pyplot as plt
+
+from methods import GaussianBeam, Lens, GaussianDistribution , airy_diameter
 
 
 # Example usage
 if __name__ == "__main__":
+
+    # Source parameters
+    wavelength = 3.21  # wavelength in mm
+    source_waist = 7.04 # mm for WR10 small cone
+    optics_diameter = 187  # diameter of the lenses in mm
+    P0 = 93.45  # mW, source power
+
+
+    # Small cone detector parameters
+    detector_aperture = 12  # diameter of the detector in mm
+    detector_acceptance_angle = 8.32 / 1.5  # acceptance angle of the detector in degrees (half-angle 1/e2)
+    detname = "smallCone"
+
     # Make sure to adjust the path according to your file location
     # Get all files from the specified directory
     path = r'C:\Users\komor\OneDrive - Wojskowa Akademia Techniczna\Pomiary\Łącze THz\Ogniska soczewek - PM4'
@@ -21,6 +35,7 @@ if __name__ == "__main__":
     lens_thickness = 8  # mm, thickness of the lens
 
     relative_point_source_position = 0  # mm, point source position relative to horn antenna
+    relative_point_source_position2 = 0  # mm, point source position relative to horn antenna
 
     total_distance_map = {
         118: 330,
@@ -96,33 +111,91 @@ if __name__ == "__main__":
 
             print(f'Saved plot for {txt_file}')
 
+
+    # Simulate focusing efficiency
+
+    object_positions = np.linspace(np.min(d_values), np.max(d_values), 100)  # Object positions
+
+    beam1 = GaussianBeam(wavelength, source_waist, 0)
+
+    lens1 = Lens(focal_length, optics_diameter, object_positions)
+    lens_power_efficiency = beam1.power_through_aperture(optics_diameter / 2, object_positions) # Overlap of the lens aperture with the source beam
+
+    beam2 = lens1.transform(beam1)
+
+    
+    image_positions = beam2.waist_position - object_positions
+
+    print(f'Image positions: {image_positions}')
+
+    detector_overlap = []
+    detector_overlap = beam2.power_through_aperture(detector_aperture / 2, beam2.waist_position) # Overlap of the detector aperture with the focused beam
+    
+
+    detector_angular_acceptance = []
+    detector_acceptance = GaussianDistribution(0, detector_acceptance_angle / 2)  # Detector acceptance in degrees (1/e2 to std dev conversion)
+
+    for angle in beam2.divergence():
+        angle_deg = np.degrees(angle)  # Convert divergence angle to degrees
+        print(f'Beam divergence angle: {angle_deg:.2f} degrees')
+        beam_shape = GaussianDistribution(0, angle_deg / 2)  # Beam divergence in degrees (1/e2 to std dev conversion)
+        detector_angular_acceptance.append(detector_acceptance.overlap_with_gaussian(beam_shape))  # Overlap of the detector acceptance with the convergence cone      
+
+    # for angle in beam2.divergence():
+    #     angle_deg = np.degrees(angle)  # Convert divergence angle to degrees
+    #     print(f'Beam divergence angle: {angle_deg:.2f} degrees')
+    #     # detector_angular_acceptance.append(detector_acceptance.overlap_with_gaussian(GaussianDistribution(0, angle / 2)))  # Overlap of the detector acceptance with the convergence cone
+    #     if angle_deg <= detector_acceptance_angle:
+    #         detector_angular_acceptance.append(1)  # Full acceptance
+    #     else:
+    #         detector_angular_acceptance.append((detector_acceptance_angle / angle_deg)**2)  # Partial acceptance
+        
+
+    
+
+    print(detector_angular_acceptance)
+
+    total_efficiency = [x * y * z for x, y, z in zip(detector_angular_acceptance, detector_overlap, lens_power_efficiency)]  # Total efficiency as a product of the three factors
+
+    def thin_lens_equation(u, f):
+        return 1 / (1 / f - 1 / u)
+    
+    image_positions_thin_lens = thin_lens_equation(object_positions, focal_length)
+
     if d_values:
         # Sort by d values for a clean plot
         sorted_indices = np.argsort(d_values)
         d_sorted = np.array(d_values)[sorted_indices]
-        args_sorted = total_distance + lens_thickness - d_sorted + np.array(max_args)[sorted_indices]
-        args_fit_sorted = total_distance + lens_thickness - d_sorted + np.array(max_args_fit)[sorted_indices]
+        image_positions_sorted = total_distance + lens_thickness - d_sorted + np.array(max_args)[sorted_indices]
+        image_positions_fit_sorted = total_distance + lens_thickness - d_sorted + np.array(max_args_fit)[sorted_indices]
 
         plt.figure()
-        plt.plot(d_sorted, args_sorted, marker='o', linestyle='-', label='Actual Maximum')
-        plt.plot(d_sorted, args_fit_sorted, marker='s', linestyle='--', label='Fitted Maximum')
-        plt.ylim(200, 900)
+        plt.plot(d_sorted, image_positions_sorted, marker='o', linestyle='', label='Actual Maximum')
+        plt.plot(d_sorted, image_positions_fit_sorted, marker='s', linestyle='', label='Fitted Maximum')
+        plt.plot(object_positions, image_positions, linestyle='--', label='Simulated Image Positions (gaussian beam model)')
+        plt.plot(object_positions, image_positions_thin_lens, linestyle='-.', label='Simulated Image Positions (thin lens model)')
+        plt.ylim(focal_length , 5 * focal_length)
         plt.xlabel('Object position [mm]')
         plt.ylabel('Image position [mm]')
         plt.title('Image vs Object Position for Focal Length ' + str(focal_length) + 'mm')
         plt.grid(True)
         plt.legend()
+        
 
         # Also plot max power values on a secondary (right) y-axis
         max_values_sorted = np.array(max_values)[sorted_indices]
         max_values_fit_sorted = np.array(max_values_fit)[sorted_indices]
         ax_left = plt.gca()
         ax_right = ax_left.twinx()
-        ax_right.plot(d_sorted, 20 * max_values_sorted, marker='^', color='C2', linestyle='-', label='Max Power')
-        ax_right.plot(d_sorted, 20 * max_values_fit_sorted, marker='v', color='C2', linestyle='--', label='Fitted Max Power')
-        ax_right.set_ylabel('Max Power [mW]', color='C2')
+        ax_right.plot(d_sorted, 20 * max_values_sorted / P0, marker='^', color='C2', linestyle='', label='Max Power')
+        ax_right.plot(d_sorted, 20 * max_values_fit_sorted / P0, marker='v', color='C2', linestyle='', label='Fitted Max Power')
+        ax_right.plot(object_positions + relative_point_source_position2, total_efficiency, color='C3', linestyle='--', label='Simulated Efficiency')
+        ax_right.plot(object_positions + relative_point_source_position2, detector_angular_acceptance, color='C4', linestyle='--', label='Detector Angular Acceptance')
+        ax_right.plot(object_positions + relative_point_source_position2, detector_overlap, color='C5', linestyle='--', label='Detector Overlap')
+        ax_right.plot(object_positions + relative_point_source_position2, lens_power_efficiency, color='C6', linestyle='--', label='Lens Power Efficiency')
+        ax_right.set_ylabel('Detection efficiency', color='C2')
         ax_right.tick_params(axis='y', labelcolor='C2')
-        ax_right.set_ylim(10,45)  # Set y-axis limit for power
+        ax_right.set_ylim(0, 1)  # Set y-axis limit for power
         
         # draw dashed lines at 2*focal_length on both axes
         ax_left.axvline(2 * focal_length, color='gray', linestyle='--', linewidth=1)
@@ -137,7 +210,7 @@ if __name__ == "__main__":
         # combine legends
         lines_left, labels_left = ax_left.get_legend_handles_labels()
         lines_right, labels_right = ax_right.get_legend_handles_labels()
-        ax_left.legend(lines_left + lines_right, labels_left + labels_right, loc='best')
+        ax_left.legend(lines_left + lines_right, labels_left + labels_right, loc='center left', bbox_to_anchor=(0, -0.4))
 
         
         
