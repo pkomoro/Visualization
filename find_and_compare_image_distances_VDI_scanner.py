@@ -19,7 +19,8 @@ if __name__ == "__main__":
 
     # Small cone detector parameters
     detector_aperture = 12  # diameter of the detector in mm
-    detector_acceptance_angle = 8.32 / 1.5  # acceptance angle of the detector in degrees (half-angle 1/e2)
+    detector_acceptance_angle = 13.20  # acceptance angle of the detector in degrees (half-angle 1/e2)
+    # 8.32 is the fit to emmision cone, 13.20 is the fit to the measured acceptance under plane wave illumination
     detname = "smallCone"
 
     # Make sure to adjust the path according to your file location
@@ -28,11 +29,11 @@ if __name__ == "__main__":
     
     plotting = False  # Set to True to enable per-file plotting, False to disable
 
-    focal_length = 180  # mm, adjust based on your lens
+    focal_length = 118  # mm, adjust based on your lens
 
     basic_lens_distance = 210  # mm, z axis position of the lens when d=0 (object at the lens)
 
-    lens_thickness = 8  # mm, thickness of the lens
+    lens_thickness = -15  # mm, thickness of the lens
 
     relative_point_source_position = 0  # mm, point source position relative to horn antenna
     relative_point_source_position2 = 0  # mm, point source position relative to horn antenna
@@ -42,7 +43,7 @@ if __name__ == "__main__":
         158: 480,
         180: 570
     }
-    total_distance = total_distance_map.get(focal_length, 870)  # default to 870 mm if focal length not found
+    total_distance = total_distance_map.get(focal_length, 870) - relative_point_source_position  # default to 870 mm if focal length not found
 
     # List all .txt files from path starting with "f" followed by the focal length and ending with .txt
     txt_files = [f for f in os.listdir(path) if f.startswith('f'+ str(focal_length)) and f.endswith('.txt')]
@@ -123,6 +124,19 @@ if __name__ == "__main__":
 
     beam2 = lens1.transform(beam1)
 
+    # # Plot beam2 radius as a function of z
+    # z_range = np.linspace(0, 600, 100)
+    # beam_radii = [beam2.radius(z + object_positions) for z in z_range] 
+    # plt.figure()
+    # plt.plot(z_range, beam_radii)
+    # plt.xlabel('z [mm]')
+    # plt.ylabel('Beam radius [mm]')
+    # plt.title('Beam Radius vs Position')
+    # plt.grid(True)
+    # plt.show()
+    # plt.close()
+   
+
     
     image_positions = beam2.waist_position - object_positions
 
@@ -162,18 +176,21 @@ if __name__ == "__main__":
     
     image_positions_thin_lens = thin_lens_equation(object_positions, focal_length)
 
+    gaussian_correction_weight = 0.7  # Weight for averaging the two models
+
     if d_values:
         # Sort by d values for a clean plot
         sorted_indices = np.argsort(d_values)
         d_sorted = np.array(d_values)[sorted_indices]
-        image_positions_sorted = total_distance + lens_thickness - d_sorted + np.array(max_args)[sorted_indices]
-        image_positions_fit_sorted = total_distance + lens_thickness - d_sorted + np.array(max_args_fit)[sorted_indices]
+        image_positions_sorted = total_distance - lens_thickness - d_sorted + np.array(max_args)[sorted_indices]
+        image_positions_fit_sorted = total_distance - lens_thickness - d_sorted + np.array(max_args_fit)[sorted_indices]
 
         plt.figure()
         plt.plot(d_sorted, image_positions_sorted, marker='o', linestyle='', label='Actual Maximum')
         plt.plot(d_sorted, image_positions_fit_sorted, marker='s', linestyle='', label='Fitted Maximum')
         plt.plot(object_positions, image_positions, linestyle='--', label='Simulated Image Positions (gaussian beam model)')
         plt.plot(object_positions, image_positions_thin_lens, linestyle='-.', label='Simulated Image Positions (thin lens model)')
+        plt.plot(object_positions, (1 - gaussian_correction_weight) * image_positions_thin_lens + gaussian_correction_weight * image_positions, linestyle=':', label='Average Image Positions')
         plt.ylim(focal_length , 5 * focal_length)
         plt.xlabel('Object position [mm]')
         plt.ylabel('Image position [mm]')
