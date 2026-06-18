@@ -1,11 +1,19 @@
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.patches import Circle
 from pathlib import Path
 import pathlib
 import re
 
+from methods import GaussianBeam, Lens
+
 if __name__ == "__main__":
 
+    # Source parameters
+    wavelength = 3.21  # wavelength in mm
+    source_waist = 7.04 # mm for WR10 small cone
+    optics_diameter = 187  # diameter of the lenses in mm
+    P0 = 93.45  # mW, source power
 
     focal_length = 180  # mm, adjust based on your lens
 
@@ -27,6 +35,7 @@ if __name__ == "__main__":
     # print(*paths, sep='\n')
 
     ploting = False
+    ploting_waist = True
 
     l = 3.21  # mm, wavelength of the beam
     w0 = 7.04  # mm, beam waist radius
@@ -68,6 +77,8 @@ if __name__ == "__main__":
     image_positions2 = [0 for i in range(len(data))]
     image_positions3 = [0 for i in range(len(data))]
     object_positions = [0 for i in range(len(data))]
+
+    waist = [0 for i in range(len(data))]
 
     for j in range(len(paths)):
             
@@ -156,12 +167,13 @@ if __name__ == "__main__":
         fit_line = np.poly1d(coefficients)
         fitted_radii = fit_line(distances[j])
         # angle_deg = np.degrees(np.arctan(coefficients[0]))
+        waist[j] = np.min(fitted_radii)
 
         image_positions[j] = distances[j][np.argmin(fitted_radii)]
         image_positions2[j] = distances[j][np.argmin(radii[j])]
         image_positions3[j] = distances[j][np.argmax(max_intensity[j])]
 
-        
+        # Divergence plot
         if ploting:
             plt.figure()
             plt.plot(distances[j], radii[j], 'o-')
@@ -175,9 +187,46 @@ if __name__ == "__main__":
             plt.savefig(paths[j] + '_divergence_plot.jpg', dpi=1000, bbox_inches='tight')
             # plt.savefig(paths[2*j] + '_divergence_plot.svg', bbox_inches='tight')
             plt.close()
-
         
+        # Waist plot
+        if ploting_waist:
+            plt.figure()
+            plt.imshow(data[j][np.argmin(fitted_radii)], cmap='inferno', aspect = 'auto',
+                    extent=[y_start - (y_start + y_stop)/2, y_stop - (y_start + y_stop)/2, y_start - (y_start + y_stop)/2, y_stop - (y_start + y_stop)/2], vmin = 0, vmax = vmax)
 
+            waist_radius = np.min(fitted_radii)
+            circle = Circle((0, 0), waist_radius, edgecolor='cyan', facecolor='none', linewidth=1.5)
+            plt.gca().add_patch(circle)
+            
+            plt.title(f'Beam waist at z = {image_positions[j]:.2f} mm')
+            plt.xlabel('X [mm]')
+            plt.ylabel('Y [mm]')
+            plt.colorbar(label='Intensity [a.u.]')
+            plt.savefig(paths[j] + '_waist_plot.jpg', dpi=1000, bbox_inches='tight')
+            plt.close()
+
+   # Measured vs theoretical beam waist values
+
+    object_positions_range = np.linspace(np.min(object_positions), np.max(object_positions), 100)  # Object positions
+
+    beam1 = GaussianBeam(wavelength, source_waist, 0)
+    lens1 = Lens(focal_length, optics_diameter, object_positions_range)
+    beam2 = lens1.transform(beam1)
+
+    print(f"Source beam divergence(): {np.degrees(beam1.divergence()):.4f} degrees")
+
+    plt.close()
+    plt.figure()
+    plt.plot(object_positions, waist, 'o-', label='Measured beam waist')
+    plt.plot(object_positions_range, beam2.waist, 'r--', label='Theoretical beam waist')
+    plt.xlabel('Object Distance (mm)')   
+    plt.ylabel('Beam Waist (mm)')
+    plt.title(f'Comparison of Measured and Theoretical Beam Waist (f={focal_length} mm)')
+    plt.legend()
+    plt.savefig(path + '/f' + str(focal_length) + 'mm_beam_waist_comparison.jpg', dpi=1000, bbox_inches='tight')
+    plt.close()
+
+    '''
     def thin_lens_equation(u, f):
         return 1 / (1 / f - 1 / u)
     
@@ -307,5 +356,5 @@ if __name__ == "__main__":
     plt.savefig(path + '/f' + str(focal_length) + 'mm_object_positions_comparison.jpg', dpi=1000, bbox_inches='tight')
     plt.close()
 
-    
+    '''
 
