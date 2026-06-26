@@ -174,7 +174,7 @@ class Lens:
         d1 = self.position - input.waist_position
         # if d1 <= 0:
         #     raise Exception("Lens positioned before waist of the input beam.")
-        w2 = np.abs(self.focal_length) * input.waist / np.sqrt((d1 -self.focal_length)**2 + input.zR ** 2)
+        w2 = np.abs(self.focal_length) * input.waist / np.sqrt((d1 - self.focal_length)**2 + input.zR ** 2)
         d2 = self.focal_length + self.focal_length ** 2 * (d1 - self.focal_length) / ((d1 - self.focal_length) ** 2 + input.zR ** 2)
 
         return GaussianBeam(input.wavelength, w2, self.position + d2)
