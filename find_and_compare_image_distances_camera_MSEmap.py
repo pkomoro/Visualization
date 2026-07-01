@@ -156,7 +156,7 @@ def compute_mse(params):
                 distances[j] = z0 + 300 - z_start - np.arange(len(data[j]))*z_step
                 
                 for k in range(len(data[j])):
-                    threshold = 1/np.e**2 * np.mean(np.sort(data[j][k].flatten())[-3:])
+                    threshold = 1/np.e**2 * np.mean(np.sort(data[j][k].flatten())[-2:])
                     radii[j][k] = np.sqrt(np.sum(data[j][k] > threshold) * 2.25 / np.pi)
                 
                 coefficients = np.polyfit(distances[j], radii[j], 11)
@@ -165,7 +165,7 @@ def compute_mse(params):
                 waist[j] = np.min(fitted_radii)
             
             # Calculate Kirchhoff waist predictions
-            z_values = np.linspace(focal_length_adjusted + 10, 600.0, 200)
+            z_values = np.linspace(focal_length_adjusted, 4 * focal_length_adjusted, 200)
             r_values = np.linspace(0, 24, 100)
             Kirchhoff_waist = []
             
@@ -175,8 +175,8 @@ def compute_mse(params):
                 max_value = np.max(intensity)
                 max_index = np.argmax(intensity)
                 max_z = z_values[max_index]
-                
-                U_values = np.array([Kirchhoff_integral(r, 0, max_z, -dis, focal_length_adjusted, w0, l, optics_diameter / 2) for r in r_values])
+                                
+                U_values = np.array([Kirchhoff_integral(r, 0, max_z, -dis, focal_length_adjusted, w0, l, optics_diameter_adjusted / 2) for r in r_values])
                 intensity = np.abs(U_values)**2
                 
                 threshold = max_value * np.exp(-2)
@@ -200,6 +200,8 @@ def compute_mse(params):
             Kirchhoff_waist_array = np.array(Kirchhoff_waist)
             waist_array = np.array(waist)
             valid_mask = ~np.isnan(Kirchhoff_waist_array)
+            
+            
             if np.sum(valid_mask) > 0:
                 mse_kirchhoff = np.mean((waist_array[valid_mask] - Kirchhoff_waist_array[valid_mask])**2)
                 total_mse += mse_kirchhoff
@@ -212,10 +214,11 @@ def compute_mse(params):
 if __name__ == '__main__':
 
     path = "C:/Users/komor/OneDrive - Wojskowa Akademia Techniczna/Pomiary/Łącze THz/Ogniska soczewek - kamera"
-    bounds = [(-10, 20), (0.8, 1), (0.75, 0.9)]  # bounds for source_distance_shift, focal_length_scaling_factor, and diameter_reduction
+    bounds = [(0, 20), (0.85, 0.95), (0.6, 0.8)]  # bounds for source_distance_shift, focal_length_scaling_factor, and diameter_reduction
+    
 
     # grid resolution for each parameter (can be adjusted)
-    grid_points = (21, 21, 21)  # number of points for source_distance_shift, focal_length_scaling_factor, and diameter_reduction
+    grid_points = (41, 41, 41)  # number of points for source_distance_shift, focal_length_scaling_factor, and diameter_reduction
     
     grids = [np.linspace(b[0], b[1], n) for b, n in zip(bounds, grid_points)]
     

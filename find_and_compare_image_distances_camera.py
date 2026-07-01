@@ -61,8 +61,7 @@ if __name__ == "__main__":
     # focal_length = 118  # mm, adjust based on your lens
     for focal_length in [118, 158, 180]:  # mm, focal lengths of the lenses used in the experiment
 
-        focal_length_import = focal_length  # mm, focal length of the lens used in the experiment
-
+        
         # source_distance_shift = 8.5
         # focal_length_scaling_factor = 0.904
         # diameter_reduction = 0.75
@@ -75,9 +74,29 @@ if __name__ == "__main__":
         # focal_length_scaling_factor = 0.914
         # diameter_reduction = 0.7
 
-        source_distance_shift = 10
-        focal_length_scaling_factor = 0.95
-        diameter_reduction = 0.9
+        # source_distance_shift = 20
+        # focal_length_scaling_factor = 0.98
+        # diameter_reduction = 0.7
+
+        # source_distance_shift = -9
+        # focal_length_scaling_factor = 0.86
+        # diameter_reduction = 0.61
+
+        # 2max 180mm
+        # source_distance_shift = 10
+        # focal_length_scaling_factor = 0.9
+        # diameter_reduction = 0.71
+
+        # 2max all lenses
+        # source_distance_shift = 6
+        # focal_length_scaling_factor = 0.91
+        # diameter_reduction = 0.7
+
+        # 2max all lenses
+        source_distance_shift = 0
+        focal_length_scaling_factor = 0.885
+        diameter_reduction = 0.635
+
 
         lens_source_distance = 210 - source_distance_shift  # mm, distance from the source to the lens derived from positions on the rail (metadane)
         total_distance_map = {
@@ -87,16 +106,15 @@ if __name__ == "__main__":
         }
         total_distance = total_distance_map.get(focal_length, 570)  # default to 570 mm if focal length not found
 
-        optics_diameter = optics_diameter * diameter_reduction  # mm, adjusted optics diameter for theoretical calculations
-        
+        optics_diameter_adjusted = optics_diameter * diameter_reduction  # mm, adjusted optics diameter for theoretical calculations        
 
-        focal_length = focal_length * focal_length_scaling_factor  # mm, adjusted focal length for theoretical calculations
+        focal_length_adjusted = focal_length * focal_length_scaling_factor  # mm, adjusted focal length for theoretical calculations
 
 
         # path to the folder containing .npy files
         path ="C:/Users/komor/OneDrive - Wojskowa Akademia Techniczna/Pomiary/Łącze THz/Ogniska soczewek - kamera"
 
-        paths = [f for f in Path(path).glob("f" + str(focal_length_import) + "*.npy")]
+        paths = [f for f in Path(path).glob("f" + str(focal_length) + "*.npy")]
 
         # print(*paths, sep='\n')
 
@@ -218,7 +236,7 @@ if __name__ == "__main__":
 
             for k in range(len(data[j])):
 
-                threshold = 1/np.e**2 * np.mean(np.sort(data[j][k].flatten())[-3:])
+                threshold = 1/np.e**2 * np.mean(np.sort(data[j][k].flatten())[-2:])
                 radii[j][k] = np.sqrt(np.sum(data[j][k] > threshold) * 2.25 / np.pi)
                 max_intensity[j][k] = np.max(data[j][k])
             
@@ -277,26 +295,27 @@ if __name__ == "__main__":
         object_positions_range = np.linspace(np.min(object_positions), np.max(object_positions), 100)  # Object positions
 
         beam1 = GaussianBeam(wavelength, source_waist, 0)
-        lens1 = Lens(focal_length, optics_diameter, object_positions_range)
+        lens1 = Lens(focal_length_adjusted, optics_diameter_adjusted, object_positions_range)
         beam2 = lens1.transform(beam1)
 
-        thin_lens_waist = source_waist * thin_lens_equation(object_positions_range, focal_length) / object_positions_range
+        thin_lens_waist = source_waist * thin_lens_equation(object_positions_range, focal_length_adjusted) / object_positions_range
 
         # Kirchhoff integral plot 
 
-        z_values = np.linspace(focal_length + 10, 600.0, 200)  # mm, range of z values to evaluate the Kirchhoff integral
+        z_values = np.linspace(1 * focal_length_adjusted, 4 * focal_length_adjusted, 200)  # mm, range of z values to evaluate the Kirchhoff integral
         r_values = np.linspace(0, 24, 100)  # mm, range of r values to evaluate the Kirchhoff integral
         Kirchhoff_waist = []
-        Kirchhoff_range = range(0,len(object_positions_range), 5)
+       
         
 
-        for idx, dis in enumerate(Kirchhoff_range):
+        for idx, dis in enumerate(range(len(object_positions))):
 
             # progress monitor for the Kirchhoff loop
-            end_char = '\n' if idx == len(Kirchhoff_range) - 1 else '\r'
-            print(f'Kirchhoff progress: {idx+1}/{len(Kirchhoff_range)} -- object_pos = {object_positions_range[dis]:.3f} mm', end=end_char, flush=True)
+            end_char = '\n' if idx == len(object_positions) - 1 else '\r'
+            print(f'Kirchhoff progress: {idx+1}/{len(object_positions)} -- object_pos = {object_positions[dis]:.3f} mm', end=end_char, flush=True)
 
-            U_values = np.array([Kirchhoff_integral(0, 0, z, -object_positions_range[dis], focal_length, w0, l, optics_diameter / 2) for z in z_values])
+            
+            U_values = np.array([Kirchhoff_integral(0, 0, z, -object_positions[dis], focal_length_adjusted, w0, l, optics_diameter_adjusted / 2) for z in z_values])
             intensity = np.abs(U_values)**2
 
             # # Plot intensity as a function of z and display
@@ -312,8 +331,9 @@ if __name__ == "__main__":
             max_value = np.max(intensity)
             max_index = np.argmax(intensity)
             max_z = z_values[max_index]
-
-            U_values = np.array([Kirchhoff_integral(r, 0, max_z, -object_positions_range[dis], focal_length, w0, l, optics_diameter / 2) for r in r_values])
+                        
+            
+            U_values = np.array([Kirchhoff_integral(r, 0, max_z, -object_positions[dis], focal_length_adjusted, w0, l, optics_diameter_adjusted / 2) for r in r_values])
             intensity = np.abs(U_values)**2
             
             # # Plot U_values as a function of r: amplitude and intensity
@@ -354,22 +374,22 @@ if __name__ == "__main__":
         plt.plot(object_positions, waist, 'o-', label='Measured beam waist')
         plt.plot(object_positions_range, beam2.waist, 'r--', label='Theoretical beam waist')
         plt.plot(object_positions_range, thin_lens_waist, 'g-.', label='Thin lens equation')
-        plt.plot(object_positions_range[Kirchhoff_range], Kirchhoff_waist, 'b:', label='Kirchhoff integral')
+        plt.plot(object_positions, Kirchhoff_waist, 'b:', label='Kirchhoff integral')
         plt.xlabel('Object Distance (mm)')   
         plt.ylabel('Beam Waist (mm)')
-        plt.ylim(3, 15)
+        plt.ylim(3, 16)
 
         # draw dashed lines for 2f and w0
-        plt.axvline(2 * focal_length, color='gray', linestyle='--', linewidth=1)
+        plt.axvline(2 * focal_length_adjusted, color='gray', linestyle='--', linewidth=1)
         plt.axhline(source_waist, color='gray', linestyle='--', linewidth=1)
         ylim = plt.Axes.get_ylim(plt.gca())
         xlim = plt.Axes.get_xlim(plt.gca())
-        plt.text(2 * focal_length, ylim[0], ' 2f', color='gray', ha='left', va='bottom')
+        plt.text(2 * focal_length_adjusted, ylim[0], ' 2f', color='gray', ha='left', va='bottom')
         plt.text(xlim[0], source_waist, ' w0', color='gray', ha='left', va='bottom')
 
-        plt.title(f'Comparison of Measured and Theoretical Beam Waist (f={focal_length_import} mm)')
+        plt.title(f'Comparison of Measured and Theoretical Beam Waist (f={focal_length} mm)')
         plt.legend()
-        plt.savefig(path + '/f' + str(focal_length_import) + 'mm_beam_waist_comparison.jpg', dpi=1000, bbox_inches='tight')
+        plt.savefig(path + '/f' + str(focal_length) + 'mm_beam_waist_comparison.jpg', dpi=1000, bbox_inches='tight')
         plt.close()
 
 
