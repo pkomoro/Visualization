@@ -394,28 +394,25 @@ if __name__ == "__main__":
 
 
         # Measured vs theoretical image positions
-        '''
+        
         plt.figure(figsize=(10, 6))
         plt.plot(object_positions, image_positions, 'o', label='Experimental (fit)', linewidth=2, markersize=8)
         plt.plot(object_positions, image_positions2, 'x', label='Experimental (min radius)', linewidth=2, markersize=8)
         plt.plot(object_positions, image_positions3, '+', label='Experimental (max intensity)', linewidth=2, markersize=8)
         object_distances = np.linspace(np.min(object_positions), np.max(object_positions), 100)  # mm, range of object distances to consider
 
-        for focal_length_scale in np.linspace(0.97, 0.99, 3):  # Adjust this scale factor as needed to better match the experimental data
-        
-            # theoretical_image_positions = thin_lens_equation(object_distances, focal_length * focal_length_scale)
-            theoretical_image_positions_gaussian = gaussian_lens_equation(object_distances, focal_length * focal_length_scale, w0, l)
+        # theoretical_image_positions = thin_lens_equation(object_distances, focal_length * focal_length_scale)
+        theoretical_image_positions_gaussian = gaussian_lens_equation(object_distances, focal_length_adjusted, w0, l)
 
-            # Plot comparison
+        # Plot comparison
             
-            # plt.plot(object_distances, theoretical_image_positions, '--', label='Thin lens equation' + f' (scale: {focal_length_scale:.2f})', linewidth=2)
-            plt.plot(object_distances, theoretical_image_positions_gaussian, '--', label='Gaussian beam' + f' (scale: {focal_length_scale:.2f})', linewidth=2)
-
+        # plt.plot(object_distances, theoretical_image_positions, '--', label='Thin lens equation' + f' (scale: {focal_length_scale:.2f})', linewidth=2)
+        plt.plot(object_distances, theoretical_image_positions_gaussian, '--', label='Gaussian beam', linewidth=2)
 
         
         z_max_values = []
         z_values = np.linspace(focal_length + 10, 600.0, 200)  # mm, range of z values to evaluate the Kirchhoff integral
-        a = 187 / 2  # mm, radius of the lens aperture
+        a = optics_diameter_adjusted / 2  # mm, radius of the lens aperture
 
 
         # Kirchhoff integral plot on object distance vs image distance
@@ -462,7 +459,7 @@ if __name__ == "__main__":
         #     plt.plot(object_distances, z_max_values, '--', label='Kirchhoff integral' + f' (scale: {scale})', linewidth=2)
         
         for zs in object_distances:
-            U_values = np.array([Kirchhoff_integral(z, -zs, focal_length, w0, l, a) for z in z_values])
+            U_values = np.array([Kirchhoff_integral(0, 0, z, -zs, focal_length_adjusted, w0, l, a) for z in z_values])
             intensity = np.abs(U_values)**2
             max_index = np.argmax(intensity)
             z_max_values.append(z_values[max_index])
@@ -482,5 +479,5 @@ if __name__ == "__main__":
         plt.savefig(path + '/f' + str(focal_length) + 'mm_object_positions_comparison.jpg', dpi=1000, bbox_inches='tight')
         plt.close()
 
-        '''
+        
 

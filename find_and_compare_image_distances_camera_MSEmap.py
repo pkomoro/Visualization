@@ -103,6 +103,7 @@ def compute_mse(params):
             radii = [np.zeros(len(data[i])) for i in range(len(data))]
             distances = [np.zeros(len(data[i])) for i in range(len(data))]
             object_positions = [0 for i in range(len(data))]
+            image_positions = [0 for i in range(len(data))]
             waist = [0 for i in range(len(data))]
             
             for j in range(len(paths)):
@@ -163,11 +164,13 @@ def compute_mse(params):
                 fit_line = np.poly1d(coefficients)
                 fitted_radii = fit_line(distances[j])
                 waist[j] = np.min(fitted_radii)
+                image_positions[j] = distances[j][np.argmin(fitted_radii)]
             
             # Calculate Kirchhoff waist predictions
             z_values = np.linspace(focal_length_adjusted, 4 * focal_length_adjusted, 200)
             r_values = np.linspace(0, 24, 100)
             Kirchhoff_waist = []
+            Kirchhoff_max_z = []
             
             for dis in object_positions:
                 U_values = np.array([Kirchhoff_integral(0, 0, z, -dis, focal_length_adjusted, w0, l, optics_diameter_adjusted / 2) for z in z_values])
@@ -175,6 +178,7 @@ def compute_mse(params):
                 max_value = np.max(intensity)
                 max_index = np.argmax(intensity)
                 max_z = z_values[max_index]
+                Kirchhoff_max_z.append(max_z)
                                 
                 U_values = np.array([Kirchhoff_integral(r, 0, max_z, -dis, focal_length_adjusted, w0, l, optics_diameter_adjusted / 2) for r in r_values])
                 intensity = np.abs(U_values)**2
@@ -198,13 +202,20 @@ def compute_mse(params):
                 Kirchhoff_waist.append(r_1e2)
             
             Kirchhoff_waist_array = np.array(Kirchhoff_waist)
+            Kirchhoff_max_z_array = np.array(Kirchhoff_max_z)
             waist_array = np.array(waist)
+            image_positions_array = np.array(image_positions)
             valid_mask = ~np.isnan(Kirchhoff_waist_array)
             
             
             if np.sum(valid_mask) > 0:
-                mse_kirchhoff = np.mean((waist_array[valid_mask] - Kirchhoff_waist_array[valid_mask])**2)
-                total_mse += mse_kirchhoff
+                mse_kirchhoff = np.mean((waist_array[valid_mask] - Kirchhoff_waist_array[valid_mask])**2 / waist_array[valid_mask]**2)
+                print(mse_kirchhoff)
+                mse_image_positions = np.mean((image_positions_array[valid_mask] - Kirchhoff_max_z_array[valid_mask])**2 / image_positions_array[valid_mask]**2)
+                print(mse_image_positions)
+                total_mse += mse_kirchhoff + mse_image_positions
+            
+
         
         return total_mse
 
@@ -218,7 +229,7 @@ if __name__ == '__main__':
     
 
     # grid resolution for each parameter (can be adjusted)
-    grid_points = (41, 41, 41)  # number of points for source_distance_shift, focal_length_scaling_factor, and diameter_reduction
+    grid_points = (2, 2, 2)  # number of points for source_distance_shift, focal_length_scaling_factor, and diameter_reduction
     
     grids = [np.linspace(b[0], b[1], n) for b, n in zip(bounds, grid_points)]
     
