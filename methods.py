@@ -175,7 +175,7 @@ class Lens:
         # if d1 <= 0:
         #     raise Exception("Lens positioned before waist of the input beam.")
         w2 = np.abs(self.focal_length) * input.waist / np.sqrt((d1 - self.focal_length)**2 + input.zR ** 2)
-        d2 = self.focal_length + self.focal_length ** 2 * (d1 - self.focal_length) / ((d1 - self.focal_length) ** 2 + input.zR ** 2)
+        d2 = self.focal_length + self.focal_length ** 2 * (np.abs(d1) - self.focal_length) / ((np.abs(d1) - self.focal_length) ** 2 + input.zR ** 2)
 
         return GaussianBeam(input.wavelength, w2, self.position + d2)
     
@@ -223,7 +223,7 @@ class GaussianDistribution:
             y2 = other.value(x)
             overlap_area = np.sum(y1 * y2) * step
             theoretical_max = np.max(y1)
-            print(f'Overlap area: {overlap_area}, Theoretical max: {theoretical_max}')
+            # print(f'Overlap area: {overlap_area}, Theoretical max: {theoretical_max}')
 
             return overlap_area / theoretical_max
 

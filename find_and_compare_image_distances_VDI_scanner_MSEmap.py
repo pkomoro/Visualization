@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from methods import GaussianBeam, Lens, GaussianDistribution , airy_diameter
 
 def gaussian_lens_equation(s, f, w0, l):
-    return 1 / (1 / f + 1 / (s + (np.pi * w0**2 / l)**2 / (s + f)))
+    return 1 / (1 / f - 1 / (s + (np.pi * w0**2 / l)**2 / (s + f)))
 
 # Example usage
 if __name__ == "__main__":
@@ -34,10 +34,10 @@ if __name__ == "__main__":
     
     focal_length = 180  # mm, adjust based on your lens
 
-    source_distance_shift = 15.75
-    focal_length_scaling_factor = 0.965
-    source_waist_scaling_factor = 0.62
-    diameter_reduction = 0.72
+    source_distance_shift = 0
+    focal_length_scaling_factor = 0.9625
+    source_waist_scaling_factor = 0.715
+    diameter_reduction = 0.725
 
     basic_lens_distance = 210 - source_distance_shift  # mm, z axis position of the lens when d=0 (object at the lens)
 
@@ -62,7 +62,7 @@ if __name__ == "__main__":
 
     # List all .txt files from path starting with "f" followed by the focal length and ending with .txt
     txt_files = [f for f in os.listdir(path) if f.startswith('f'+ str(focal_length)) and f.endswith('.txt')]
-    # print(txt_files)
+    print(txt_files)
 
     d_values = []
     max_args = []
@@ -155,6 +155,9 @@ if __name__ == "__main__":
     
     image_positions = beam2.waist_position - object_positions
 
+    image_positions_gaussian_beam = gaussian_lens_equation(object_positions, focal_length_adjusted, source_waist_adjusted, wavelength)
+
+    print(f'Image positions: {image_positions}')
 
     detector_overlap = []
     detector_overlap = beam2.power_through_aperture(detector_aperture / 2, beam2.waist_position) # Overlap of the detector aperture with the focused beam
@@ -165,7 +168,7 @@ if __name__ == "__main__":
 
     for angle in beam2.divergence():
         angle_deg = np.degrees(angle)  # Convert divergence angle to degrees
-        # print(f'Beam divergence angle: {angle_deg:.2f} degrees')
+        print(f'Beam divergence angle: {angle_deg:.2f} degrees')
         beam_shape = GaussianDistribution(0, angle_deg / 2)  # Beam divergence in degrees (1/e2 to std dev conversion)
         detector_angular_acceptance.append(detector_acceptance.overlap_with_gaussian(beam_shape))  # Overlap of the detector acceptance with the convergence cone      
 
@@ -181,7 +184,7 @@ if __name__ == "__main__":
 
     
 
-    # print(detector_angular_acceptance)
+    print(detector_angular_acceptance)
 
     total_efficiency = [x * y * z for x, y, z in zip(detector_angular_acceptance, detector_overlap, lens_power_efficiency)]  # Total efficiency as a product of the three factors
 
@@ -204,6 +207,7 @@ if __name__ == "__main__":
         plt.plot(d_sorted, image_positions_fit_sorted, marker='s', linestyle='', label='Fitted Maximum')
         plt.plot(object_positions, image_positions, linestyle='--', label='Simulated Image Positions (gaussian beam model)')
         plt.plot(object_positions, image_positions_thin_lens, linestyle='-.', label='Simulated Image Positions (thin lens model)')
+        plt.plot(object_positions, image_positions_gaussian_beam, linestyle=':', label='Simulated Image Positions (gaussian beam model)')
         plt.ylim(focal_length_adjusted , 5 * focal_length_adjusted)
         plt.xlabel('Object position [mm]')
         plt.ylabel('Image position [mm]')

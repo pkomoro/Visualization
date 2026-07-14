@@ -14,7 +14,7 @@ def thin_lens_equation(u, f):
         return 1 / (1 / f - 1 / u)
     
 def gaussian_lens_equation(s, f, w0, l):
-    return 1 / (1 / f - 1 / (s + (np.pi * w0**2 / l)**2 / (s + f)))
+    return 1 / (1 / f + 1 / ((np.pi * w0**2 / l)**2 / (f - s) - s))
     
 def Kirchhoff_integral(r, theta, z, zs, f, ws, l, a):
         # Kazumasa Tanaka and Osamu Kanzaki, "Focus of a diffracted Gaussian beam through a finite aperture lens: experimental and numerical investigations," Appl. Opt. 26, 390-395 (1987)
@@ -57,18 +57,19 @@ source_waist = 7.04 # mm for WR10 small cone
 optics_diameter = 187  # diameter of the lenses in mm
 P0 = 93.45  # mW, source power
 
-lens_thickness = 0  # mm, thickness of the lens
+lens_thickness = 2  # mm, thickness of the lens
 
 # Define objective function to minimize
 def compute_mse(params):
-        source_distance_shift, focal_length_scaling_factor, diameter_reduction = params
+        source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, diameter_reduction = params
         total_mse = 0.0
 
         # print(f"Evaluating parameters: source_distance_shift={source_distance_shift}, focal_length_scaling_factor={focal_length_scaling_factor}, diameter_reduction={diameter_reduction}")
 
         optics_diameter_adjusted = optics_diameter * diameter_reduction
+        source_waist_adjusted = source_waist * source_waist_scaling_factor
         
-        for focal_length in [118, 158, 180]:  # mm, focal lengths of the lenses used in the experiment
+        for focal_length in [118]:  # mm, focal lengths of the lenses used in the experiment
             focal_length_import = focal_length
             lens_source_distance = 210 - source_distance_shift
             total_distance_map = {
@@ -97,8 +98,6 @@ def compute_mse(params):
                 data_meta[i] = file.read()
                 file.close()
             
-            l = 3.21
-            w0 = 7.04
             
             radii = [np.zeros(len(data[i])) for i in range(len(data))]
             distances = [np.zeros(len(data[i])) for i in range(len(data))]
@@ -171,50 +170,61 @@ def compute_mse(params):
             r_values = np.linspace(0, 24, 100)
             Kirchhoff_waist = []
             Kirchhoff_max_z = []
+
+            theoretical_image_positions_gaussian = gaussian_lens_equation(object_positions, focal_length_adjusted, source_waist_adjusted, wavelength)
             
-            for dis in object_positions:
-                U_values = np.array([Kirchhoff_integral(0, 0, z, -dis, focal_length_adjusted, w0, l, optics_diameter_adjusted / 2) for z in z_values])
-                intensity = np.abs(U_values)**2
-                max_value = np.max(intensity)
-                max_index = np.argmax(intensity)
-                max_z = z_values[max_index]
-                Kirchhoff_max_z.append(max_z)
-                                
-                U_values = np.array([Kirchhoff_integral(r, 0, max_z, -dis, focal_length_adjusted, w0, l, optics_diameter_adjusted / 2) for r in r_values])
-                intensity = np.abs(U_values)**2
-                
-                threshold = max_value * np.exp(-2)
-                below_indices = np.where(intensity <= threshold)[0]
-                if below_indices.size > 0:
-                    first_below = below_indices[0]
-                    if first_below > 0:
-                        r_lo, r_hi = r_values[first_below - 1], r_values[first_below]
-                        I_lo, I_hi = intensity[first_below - 1], intensity[first_below]
-                        if I_hi != I_lo:
-                            r_1e2 = r_lo + (threshold - I_lo) * (r_hi - r_lo) / (I_hi - I_lo)
+            waist_analysis = False  # Set to True for waist analysis, False for image position analysis
+
+            if waist_analysis:
+                for dis in object_positions:
+                    U_values = np.array([Kirchhoff_integral(0, 0, z, -dis, focal_length_adjusted, source_waist_adjusted, wavelength, optics_diameter_adjusted / 2) for z in z_values])
+                    intensity = np.abs(U_values)**2
+                    max_value = np.max(intensity)
+                    max_index = np.argmax(intensity)
+                    max_z = z_values[max_index]
+                    Kirchhoff_max_z.append(max_z)
+                                    
+                    U_values = np.array([Kirchhoff_integral(r, 0, max_z, -dis, focal_length_adjusted, source_waist_adjusted, wavelength, optics_diameter_adjusted / 2) for r in r_values])
+                    intensity = np.abs(U_values)**2
+                    
+                    threshold = max_value * np.exp(-2)
+                    below_indices = np.where(intensity <= threshold)[0]
+                    if below_indices.size > 0:
+                        first_below = below_indices[0]
+                        if first_below > 0:
+                            r_lo, r_hi = r_values[first_below - 1], r_values[first_below]
+                            I_lo, I_hi = intensity[first_below - 1], intensity[first_below]
+                            if I_hi != I_lo:
+                                r_1e2 = r_lo + (threshold - I_lo) * (r_hi - r_lo) / (I_hi - I_lo)
+                            else:
+                                r_1e2 = r_lo
                         else:
-                            r_1e2 = r_lo
+                            r_1e2 = r_values[first_below]
                     else:
-                        r_1e2 = r_values[first_below]
-                else:
-                    r_1e2 = np.nan
+                        r_1e2 = np.nan
+                    
+                    Kirchhoff_waist.append(r_1e2)
                 
-                Kirchhoff_waist.append(r_1e2)
-            
-            Kirchhoff_waist_array = np.array(Kirchhoff_waist)
+                Kirchhoff_waist_array = np.array(Kirchhoff_waist)
             Kirchhoff_max_z_array = np.array(Kirchhoff_max_z)
             waist_array = np.array(waist)
+            
+            valid_mask = ~np.isnan(Kirchhoff_max_z_array)
+
+            Gauss_image_positions_array = np.array(theoretical_image_positions_gaussian)
             image_positions_array = np.array(image_positions)
-            valid_mask = ~np.isnan(Kirchhoff_waist_array)
+            valid_mask = ~np.isnan(Gauss_image_positions_array)
+
             
             
             if np.sum(valid_mask) > 0:
-                mse_kirchhoff = np.mean((waist_array[valid_mask] - Kirchhoff_waist_array[valid_mask])**2 / waist_array[valid_mask]**2)
-                print(mse_kirchhoff)
-                mse_image_positions = np.mean((image_positions_array[valid_mask] - Kirchhoff_max_z_array[valid_mask])**2 / image_positions_array[valid_mask]**2)
-                print(mse_image_positions)
-                total_mse += mse_kirchhoff + mse_image_positions
-            
+                if waist_analysis:
+                    mse_waist = np.mean((waist_array[valid_mask] - Kirchhoff_waist_array[valid_mask])**2 / waist_array[valid_mask]**2)
+                    total_mse += mse_waist
+                else:
+                    mse_image_positions = np.mean((image_positions_array[valid_mask] - Gauss_image_positions_array[valid_mask])**2 / image_positions_array[valid_mask]**2)
+                    total_mse += mse_image_positions
+                
 
         
         return total_mse
@@ -225,12 +235,16 @@ def compute_mse(params):
 if __name__ == '__main__':
 
     path = "C:/Users/komor/OneDrive - Wojskowa Akademia Techniczna/Pomiary/Łącze THz/Ogniska soczewek - kamera"
-    bounds = [(0, 20), (0.85, 0.95), (0.6, 0.8)]  # bounds for source_distance_shift, focal_length_scaling_factor, and diameter_reduction
+
     
+    bounds = [(0, 20), (0.95, 1), (0.65, 0.65), (0.61, 0.61)]  # bounds for source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, and diameter_reduction
+    # bounds = [(1.75, 1.75), (0.98, 0.98), (0.5, 0.7), (0.5, 0.7)]  # bounds for source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, and diameter_reduction
+
 
     # grid resolution for each parameter (can be adjusted)
-    grid_points = (2, 2, 2)  # number of points for source_distance_shift, focal_length_scaling_factor, and diameter_reduction
-    
+    grid_points = (81, 41, 1, 1)  # number of points for source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, and diameter_reduction
+    # grid_points = (1, 1, 41, 41)  # number of points for source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, and diameter_reduction
+
     grids = [np.linspace(b[0], b[1], n) for b, n in zip(bounds, grid_points)]
     
     # create list of parameter tuples
@@ -246,7 +260,7 @@ if __name__ == '__main__':
     print("\nGrid evaluation complete.")
 
     results = np.array(results)
-    # reshape to 3D array matching grid_points
+    # reshape to 4D array matching grid_points
     mse_map = results.reshape(grid_points)
 
     # print minimal mse and corresponding parameters
@@ -255,12 +269,14 @@ if __name__ == '__main__':
     best_params = (
         grids[0][min_index[0]],
         grids[1][min_index[1]],
-        grids[2][min_index[2]]
+        grids[2][min_index[2]],
+        grids[3][min_index[3]]
     )
     print(f'Minimal mse: {min_mse:.6e}')
     print(f'Best parameters: source_distance_shift={best_params[0]:.6f}, '
           f'focal_length_scaling_factor={best_params[1]:.6f}, '
-          f'diameter_reduction={best_params[2]:.6f}')
+          f'source_waist_scaling_factor={best_params[2]:.6f}, '
+          f'diameter_reduction={best_params[3]:.6f}')
 
 
     # save and print summary
@@ -269,16 +285,20 @@ if __name__ == '__main__':
     print(f'Saved mse_map to {out_path} with shape {mse_map.shape}')
 
 
-    # visualize mse_map as 2D slices at the middle index of each parameter
-    fig, axs = plt.subplots(1, 3, figsize=(18, 5))
-    slice_indices = [grid_points[0] // 2, grid_points[1] // 2, grid_points[2] // 2]
+    # visualize mse_map as 2D slices at the indices of minimal mse for 4D data
+    fig, axs = plt.subplots(2, 3, figsize=(18, 10))
+    slice_indices = list(min_index)
+
     slice_configs = [
-        (mse_map[slice_indices[0], :, :], grids[1], grids[2], 'focal_length_scaling_factor', 'diameter_reduction', f'source_distance_shift={grids[0][slice_indices[0]]:.3f}'),
-        (mse_map[:, slice_indices[1], :], grids[0], grids[2], 'source_distance_shift', 'diameter_reduction', f'focal_length_scaling_factor={grids[1][slice_indices[1]]:.3f}'),
-        (mse_map[:, :, slice_indices[2]], grids[0], grids[1], 'source_distance_shift', 'focal_length_scaling_factor', f'diameter_reduction={grids[2][slice_indices[2]]:.3f}')
+        (mse_map[:, :, slice_indices[2], slice_indices[3]], grids[1], grids[0], 'focal_length_scaling_factor', 'source_distance_shift', f'source_waist_scaling_factor={grids[2][slice_indices[2]]:.3f}, diameter_reduction={grids[3][slice_indices[3]]:.3f}'),
+        (mse_map[:, slice_indices[1], :, slice_indices[3]], grids[2], grids[0], 'source_waist_scaling_factor', 'source_distance_shift', f'focal_length_scaling_factor={grids[1][slice_indices[1]]:.3f}, diameter_reduction={grids[3][slice_indices[3]]:.3f}'),
+        (mse_map[:, slice_indices[1], slice_indices[2], :], grids[3], grids[0], 'diameter_reduction', 'source_distance_shift', f'focal_length_scaling_factor={grids[1][slice_indices[1]]:.3f}, source_waist_scaling_factor={grids[2][slice_indices[2]]:.3f}'),
+        (mse_map[slice_indices[0], :, :, slice_indices[3]], grids[2], grids[1], 'source_waist_scaling_factor', 'focal_length_scaling_factor', f'source_distance_shift={grids[0][slice_indices[0]]:.3f}, diameter_reduction={grids[3][slice_indices[3]]:.3f}'),
+        (mse_map[slice_indices[0], :, slice_indices[2], :], grids[3], grids[1], 'diameter_reduction', 'focal_length_scaling_factor', f'source_distance_shift={grids[0][slice_indices[0]]:.3f}, source_waist_scaling_factor={grids[2][slice_indices[2]]:.3f}'),
+        (mse_map[slice_indices[0], slice_indices[1], :, :], grids[3], grids[2], 'diameter_reduction', 'source_waist_scaling_factor', f'source_distance_shift={grids[0][slice_indices[0]]:.3f}, focal_length_scaling_factor={grids[1][slice_indices[1]]:.3f}')
     ]
 
-    for ax, (data_slice, x_vals, y_vals, xlabel, ylabel, title) in zip(axs, slice_configs):
+    for ax, (data_slice, x_vals, y_vals, xlabel, ylabel, title) in zip(axs.flatten(), slice_configs):
         im = ax.imshow(data_slice, origin='lower', aspect='auto', extent=(x_vals[0], x_vals[-1], y_vals[0], y_vals[-1]), cmap='viridis')
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
