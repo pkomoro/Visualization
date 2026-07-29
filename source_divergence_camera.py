@@ -162,6 +162,9 @@ if __name__ == "__main__":
         
         plt.plot(combined_distances, combined_radii, 'o', markersize=4, label='Data')
         plt.plot(sorted_distances, fitted_radii, '--', color='cyan', linewidth=2, label='Linear fit')
+        plt.text(0.7, 0.95, f'$\\theta = {angle_deg:.2f}°$', transform=plt.gca().transAxes,
+                 va='top', color='black', fontsize=11)
+        
         plt.xlabel('Distance (mm)')
         plt.ylabel('Radius (mm)')
         plt.title('Divergence of the beam')
