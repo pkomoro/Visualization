@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
 
     # Small cone detector parameters
-    detector_aperture = 12  # diameter of the detector in mm
+    detector_aperture = 1.2 * 7  # diameter of the detector in mm
     detector_acceptance_angle = 13.20  # acceptance angle of the detector in degrees (half-angle 1/e2)
     # 8.32 is the fit to emmision cone, 13.20 is the fit to the measured acceptance under plane wave illumination
     detname = "smallCone"
@@ -32,12 +32,27 @@ if __name__ == "__main__":
     plotting = False  # Set to True to enable per-file plotting, False to disable
 
     
-    focal_length = 180  # mm, adjust based on your lens
+    # focal_length = 158  # mm, adjust based on your lens
 
-    source_distance_shift = 15.75
-    focal_length_scaling_factor = 0.965
-    source_waist_scaling_factor = 0.62
-    diameter_reduction = 0.72
+    # source_distance_shift = 2
+    # focal_length_scaling_factor = 0.965
+    # source_waist_scaling_factor = 0.69
+    # diameter_reduction = 0.8
+
+
+    # focal_length = 158  # mm, adjust based on your lens
+
+    # source_distance_shift = 0
+    # focal_length_scaling_factor = 0.965
+    # source_waist_scaling_factor = 0.7
+    # diameter_reduction = 0.7
+
+    focal_length = 118  # mm, adjust based on your lens
+
+    source_distance_shift = 0
+    focal_length_scaling_factor = 0.9475
+    source_waist_scaling_factor = 0.65
+    diameter_reduction = 0.6
 
     basic_lens_distance = 210 - source_distance_shift  # mm, z axis position of the lens when d=0 (object at the lens)
 

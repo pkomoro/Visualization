@@ -59,7 +59,7 @@ if __name__ == "__main__":
     lens_thickness = 2  # mm, thickness of the lens
 
     # focal_length = 118  # mm, adjust based on your lens
-    for focal_length in [118]:  # mm, focal lengths of the lenses used in the experiment
+    for focal_length in [180]:  # mm, focal lengths of the lenses used in the experiment
 
         
         # source_distance_shift = 8.5
@@ -167,10 +167,10 @@ if __name__ == "__main__":
 
         '''Corrected signs in gaussian_lens_equation'''
         # 180 mm image position + waist scalling
-        # source_distance_shift = 15.75
-        # focal_length_scaling_factor = 0.965
-        # source_waist_scaling_factor = 0.62
-        # diameter_reduction = 0.72
+        source_distance_shift = 15.75
+        focal_length_scaling_factor = 0.965
+        source_waist_scaling_factor = 0.62
+        diameter_reduction = 0.72
 
         # 158 mm image position + waist scalling
         # source_distance_shift = 4.0
@@ -179,10 +179,10 @@ if __name__ == "__main__":
         # diameter_reduction = 0.65
 
         # 118 mm image position + waist scalling
-        source_distance_shift = 0
-        focal_length_scaling_factor = 0.98375
-        source_waist_scaling_factor = 0.65
-        diameter_reduction = 0.61
+        # source_distance_shift = 0
+        # focal_length_scaling_factor = 0.98375
+        # source_waist_scaling_factor = 0.65
+        # diameter_reduction = 0.61
 
 
         lens_source_distance = 210 - source_distance_shift  # mm, distance from the source to the lens derived from positions on the rail (metadane)
@@ -208,7 +208,7 @@ if __name__ == "__main__":
         # print(*paths, sep='\n')
 
         ploting = False
-        ploting_waist = False
+        ploting_waist = True
         
 
         paths_meta = [f for f in Path(path).glob("*.meta")]
@@ -314,6 +314,8 @@ if __name__ == "__main__":
             if ploting:
                 plt.imshow(image[int((y_stop-y_start)/1.5/2) + y,:,:], cmap='inferno', aspect = 'auto',
                         extent=[z0 + 300 - z_stop, z0 + 300 - z_start, y_start - (y_start + y_stop)/2, y_stop - (y_start + y_stop)/2], vmin = 0, vmax = vmax)
+                plt.xlabel('z [mm]')
+                plt.ylabel('y [mm]')
 
             distances[j] = z0 + 300 - z_start - np.arange(len(data[j]))*z_step
 
@@ -328,7 +330,7 @@ if __name__ == "__main__":
             
             if ploting:
                 plt.savefig(paths[j] + '_xz_y' + str(y) + 'px.jpg', dpi = 300, bbox_inches='tight')
-                # plt.savefig(paths[2*j] + '_xz_y' + str(y) + 'px.svg')
+                plt.savefig(paths[j] + '_xz_y' + str(y) + 'px.svg', bbox_inches='tight')
                 plt.close()
 
             
@@ -344,37 +346,52 @@ if __name__ == "__main__":
             image_positions2[j] = distances[j][np.argmin(radii[j])]
             image_positions3[j] = distances[j][np.argmax(max_intensity[j])]
 
+            print(f"Lens position: {lens_d} mm, Object position: {object_positions[j]:.2f} mm, Image position (fit): {image_positions[j]:.2f} mm, Image position (min radius): {image_positions2[j]:.2f} mm, Image position (max intensity): {image_positions3[j]:.2f} mm, Waist: {waist[j]:.2f} mm")
+
             # Divergence plot
             if ploting:
                 plt.figure()
-                plt.plot(distances[j], radii[j], 'o-')
+                plt.plot(distances[j], radii[j], 'o-', label='Measured $1/e^2$ radius', markersize=4)
                 # plt.plot(distances[j], fitted_radii, 'r--', label=f'Fit: {angle_deg:.2f}°')
-                plt.plot(distances[j], fitted_radii, 'r--')
-                # plt.legend()
-                plt.xlabel('Distance (mm)')
-                plt.ylabel('Radius (mm)')
-                plt.title('Divergence of the beam')
+                plt.plot(distances[j], fitted_radii, 'r--', label='Polynomial fit')
+                plt.legend()
+                plt.xlabel('Distance [mm]')
+                plt.ylabel(r'$1/e^2$ radius [mm]')
+
+                # plt.title('Divergence of the beam')
         
                 plt.savefig(paths[j] + '_divergence_plot.jpg', dpi=1000, bbox_inches='tight')
-                # plt.savefig(paths[2*j] + '_divergence_plot.svg', bbox_inches='tight')
+                plt.savefig(paths[j] + '_divergence_plot.svg', bbox_inches='tight')
                 plt.close()
             
             # Waist plot
             if ploting_waist:
+                shift = 0
+                vmax_change = 1
+                circle_shift = 0
+                # if paths[j].find('d630mm') != -1:
+                #     shift = 100
+                #     vmax_change = 0.1
+                #     circle_shift = -5
+
                 plt.figure()
-                plt.imshow(data[j][np.argmin(fitted_radii)], cmap='inferno', aspect = 'auto',
-                        extent=[y_start - (y_start + y_stop)/2, y_stop - (y_start + y_stop)/2, y_start - (y_start + y_stop)/2, y_stop - (y_start + y_stop)/2], vmin = 0, vmax = vmax)
+                plt.imshow(data[j][np.argmin(fitted_radii) + shift], cmap='inferno', aspect = 'auto',
+                        extent=[y_start - (y_start + y_stop)/2, y_stop - (y_start + y_stop)/2, y_start - (y_start + y_stop)/2, y_stop - (y_start + y_stop)/2], vmin = 0, vmax = vmax * vmax_change)
 
                 waist_radius = np.min(fitted_radii)
-                circle = Circle((0, 0), waist_radius, edgecolor='cyan', facecolor='none', linewidth=1.5)
+                waist_radius = fitted_radii[np.argmin(fitted_radii) + shift]
+                circle = Circle((circle_shift, 0), waist_radius, edgecolor='cyan', facecolor='none', linewidth=1.5)
                 plt.gca().add_patch(circle)
                 
-                plt.title(f'Beam waist at z = {image_positions[j]:.2f} mm')
-                plt.xlabel('X [mm]')
-                plt.ylabel('Y [mm]')
+                # plt.title(f'Beam waist at z = {image_positions[j]:.2f} mm')
+                plt.xlabel('x [mm]')
+                plt.ylabel('y [mm]')
                 plt.colorbar(label='Intensity [a.u.]')
                 plt.savefig(paths[j] + '_waist_plot.jpg', dpi=1000, bbox_inches='tight')
+                plt.savefig(paths[j] + '_waist_plot.svg', bbox_inches='tight')
                 plt.close()
+            
+
 
     # Measured vs theoretical beam waist values
 
@@ -424,7 +441,7 @@ if __name__ == "__main__":
             
             # # Plot U_values as a function of r: amplitude and intensity
             # plt.figure()
-            # plt.plot(r_values, intensity, label='Intensity |U(r)|^2')
+            # plt.plot(r_values, intensity, label=r'Intensity $|U(r)|^2$')
             # plt.xlabel('r [mm]')
             # plt.ylabel('Amplitude / Intensity')
             # plt.title(f'U(r) at object pos {object_positions_range[dis]:.2f} mm, z = {max_z:.2f} mm')
