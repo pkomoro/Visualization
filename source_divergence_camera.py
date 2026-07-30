@@ -3,12 +3,13 @@ from matplotlib import pyplot as plt
 from pathlib import Path
 import pathlib
 import re
+from scipy.optimize import curve_fit
 
 if __name__ == "__main__":
 
 
     # path to the folder containing .npy files
-    path ="D:\\OneDrive - Wojskowa Akademia Techniczna\\Pomiary\\Łącze THz\\Terasense 90 mW"
+    path ="C:\\Users\\komor\\OneDrive - Wojskowa Akademia Techniczna\\Pomiary\\Łącze THz\\Terasense 90 mW"
 
     
     paths = [f for f in Path(path).glob("*.npy")]
@@ -26,6 +27,7 @@ if __name__ == "__main__":
     data = paths.copy()
 
     data_meta = paths_meta.copy()
+    pixel_sizes = []
 
     for i in range(len(paths)):
         data[i] = np.load(Path(paths[i]))
@@ -34,6 +36,8 @@ if __name__ == "__main__":
         data_meta[i] = file.read()
         file.close()
 
+    data_meta_copy = data_meta.copy()
+    
     for i in range(len(paths)):
         paths[i] = paths[i].absolute().as_posix()[:-4]
 
@@ -51,49 +55,50 @@ if __name__ == "__main__":
     ax.set_facecolor('black')
 
     radii = [np.zeros(len(data[i])) for i in range(len(data))]
-    radii2 = [np.zeros(len(data[i])) for i in range(len(data))]
     distances = [np.zeros(len(data[i])) for i in range(len(data))]
 
-    image_positions = [0 for i in range(len(data))]
-    object_positions = [0 for i in range(len(data))]
 
     for j in range(len(paths)):
         
-        index = data_meta[j].find("Camera exposure setting:")
-        data_meta[j] = data_meta[j][(index+25):]
+        pixel_size_match = re.search(r"Pixel size[: ]*\s*([0-9]*\.?[0-9]+)", data_meta[j])
+        pixel_size = float(pixel_size_match.group(1)) if pixel_size_match else 1.0
+        pixel_sizes.append(pixel_size)
 
-        index = data_meta[j].find("Pixel size")
-        exposure = int(data_meta[j][:(index-1)])
+        index = data_meta_copy[j].find("Camera exposure setting:")
+        data_meta_copy[j] = data_meta_copy[j][(index+25):]
 
-        index = data_meta[j].find("Start Y")
-        data_meta[j] = data_meta[j][(index+9):]
+        index = data_meta_copy[j].find("Pixel size")
+        exposure = int(data_meta_copy[j][:(index-1)])
 
-        index = data_meta[j].find("mm")
-        y_start = float(data_meta[j][:(index-1)])
+        index = data_meta_copy[j].find("Start Y")
+        data_meta_copy[j] = data_meta_copy[j][(index+9):]
 
-        index = data_meta[j].find("Stop Y")
-        data_meta[j] = data_meta[j][(index+8):]
+        index = data_meta_copy[j].find("mm")
+        y_start = float(data_meta_copy[j][:(index-1)])
 
-        index = data_meta[j].find("mm")
-        y_stop = float(data_meta[j][:(index-1)])
+        index = data_meta_copy[j].find("Stop Y")
+        data_meta_copy[j] = data_meta_copy[j][(index+8):]
 
-        index = data_meta[j].find("Step Z")
-        data_meta[j] = data_meta[j][(index+8):]
+        index = data_meta_copy[j].find("mm")
+        y_stop = float(data_meta_copy[j][:(index-1)])
 
-        index = data_meta[j].find("mm")
-        z_step = float(data_meta[j][:(index-1)])
+        index = data_meta_copy[j].find("Step Z")
+        data_meta_copy[j] = data_meta_copy[j][(index+8):]
 
-        index = data_meta[j].find("Start Z")
-        data_meta[j] = data_meta[j][(index+9):]
+        index = data_meta_copy[j].find("mm")
+        z_step = float(data_meta_copy[j][:(index-1)])
 
-        index = data_meta[j].find("mm")
-        z_start = float(data_meta[j][:(index-1)])
+        index = data_meta_copy[j].find("Start Z")
+        data_meta_copy[j] = data_meta_copy[j][(index+9):]
 
-        index = data_meta[j].find("Stop Z")
-        data_meta[j] = data_meta[j][(index+8):]
+        index = data_meta_copy[j].find("mm")
+        z_start = float(data_meta_copy[j][:(index-1)])
 
-        index = data_meta[j].find("mm")
-        z_stop = float(data_meta[j][:(index-1)])
+        index = data_meta_copy[j].find("Stop Z")
+        data_meta_copy[j] = data_meta_copy[j][(index+8):]
+
+        index = data_meta_copy[j].find("mm")
+        z_stop = float(data_meta_copy[j][:(index-1)])
 
         z0 = 175
         
@@ -116,9 +121,8 @@ if __name__ == "__main__":
         ax.set_ylim(-5 * 24, 5 * 24)
 
         for k in range(len(data[j])):           
-            threshold = 1/np.e**2 * np.max(data[j][k])
+            threshold = 1/np.e**2 * np.mean(np.sort(data[j][k].flatten())[-500:])
             radii[j][k] = np.sqrt(np.sum(data[j][k] > threshold) * 2.25 / np.pi)
-            radii2[j][k] = np.sqrt(np.sum(data[j][k] > threshold) * 2.25 / np.pi)
         
     
     if ploting:
@@ -135,11 +139,17 @@ if __name__ == "__main__":
                 -fit_line(sorted_distances),
                 '--', color='cyan', linewidth=1)
 
-        z_arrow = 440
+        # plot vertical dotted lines at specified z positions (mm)
+        for z_vert in (185, 325, 465):
+            ax.axvline(x=z_vert, color='white', linestyle=':', linewidth=1)
+
+        z_arrow = 400
         ax.annotate('', xy=(z_arrow, fit_line(z_arrow)), xytext=(z_arrow, -fit_line(z_arrow)),
                     arrowprops=dict(arrowstyle='<->', color='cyan', linewidth=1.5))
 
-        plt.text(sorted_distances[-1], fit_line(sorted_distances[-1]), '$1/e^2$ diameter', va='bottom', ha='right', fontsize=11, color='cyan')
+        plt.text(sorted_distances[-5], fit_line(sorted_distances[-5]), '$1/e^2$ diameter', va='bottom', ha='right', fontsize=11, color='cyan')
+
+        
 
 
         plt.savefig(Path(path) / 'divergence_plot.jpg', dpi=1000, bbox_inches='tight')
@@ -162,6 +172,9 @@ if __name__ == "__main__":
         
         plt.plot(combined_distances, combined_radii, 'o', markersize=4, label='Data')
         plt.plot(sorted_distances, fitted_radii, '--', color='cyan', linewidth=2, label='Linear fit')
+        # plot vertical dotted lines at specified z positions (mm)
+        for z_vert in (185, 325, 465):
+            plt.axvline(x=z_vert, color='black', linestyle=':', linewidth=1)
         plt.text(0.7, 0.95, f'$\\theta = {angle_deg:.2f}°$', transform=plt.gca().transAxes,
                  va='top', color='black', fontsize=11)
         
@@ -172,6 +185,82 @@ if __name__ == "__main__":
         plt.grid(True, alpha=0.3)
         plt.savefig(Path(path) / 'combined_divergence_plot.jpg', dpi=1000, bbox_inches='tight')
         plt.close()
+
+        for selected_j, selected_k in [(0, 1), (1, 0), (1, 28)]:
+            selected_image = data[selected_j][selected_k]
+
+            data_meta_copy = data_meta.copy()
+
+            index = data_meta_copy[selected_j].find("Start Y")
+            data_meta_copy[selected_j] = data_meta_copy[selected_j][(index+9):]
+            index = data_meta_copy[selected_j].find("mm")
+            y_start = float(data_meta_copy[selected_j][:(index-1)])
+            index = data_meta_copy[selected_j].find("Stop Y")
+            data_meta_copy[selected_j] = data_meta_copy[selected_j][(index+8):]
+            index = data_meta_copy[selected_j].find("mm")
+            y_stop = float(data_meta_copy[selected_j][:(index-1)])
+            
+            
+            y_max_idx = int((y_stop-y_start)/1.5/2) + 0
+            x_max_idx = len(selected_image[y_max_idx, :]) // 2
+            
+            print(f"Selected image: {selected_j}, {selected_k}, max intensity at (y, x): ({y_max_idx}, {x_max_idx})")
+            profile = selected_image[y_max_idx, :]
+            x_pixels = np.arange(profile.size)
+            pixel_size = pixel_sizes[selected_j]
+            x_positions = x_pixels * pixel_size
+            selected_distance = distances[selected_j][selected_k]
+            fitted_radius = fit_line(selected_distance)
+            x_center = x_positions[x_max_idx]
+
+
+
+            def gaussian_func(x, amplitude, center, sigma, offset):
+                return amplitude * np.exp(-((x - center) ** 2) / (2 * sigma ** 2))
+
+            amplitude_guess = profile.max() - profile.min()
+            offset_guess = profile.min()
+            sigma_guess = fitted_radius / 2 if fitted_radius > 0 else 1.0
+            try:
+                popt, _ = curve_fit(
+                    gaussian_func,
+                    x_positions,
+                    profile,
+                    p0=[amplitude_guess, x_center, sigma_guess, offset_guess],
+                    bounds=([0, x_positions[0], 0, -np.inf], [np.inf, x_positions[-1], np.inf, np.inf]),
+                    maxfev=10000,
+                )
+                fitted_amplitude, fitted_center, fitted_sigma, fitted_offset = popt
+                gaussian_profile = gaussian_func(x_positions, *popt)
+                fitted_radius_gauss = 2 * fitted_sigma
+            except Exception:
+                gaussian_profile = np.mean(np.sort(profile)[-5:]) * np.exp(
+                    -((x_positions - x_center) ** 2) / (2 * (fitted_radius / 2) ** 2)
+                )
+                fitted_radius_gauss = fitted_radius
+
+            gaussian_model = gaussian_func(
+                x_positions,
+                np.max(gaussian_profile),
+                x_center,
+                fitted_radius / 2 if fitted_radius > 0 else 1.0,
+                offset_guess,
+            )
+
+            plt.figure(figsize=(6, 4))
+            plt.plot(x_positions, profile, '-', label='Beam cross-section')
+            plt.plot(x_positions, gaussian_profile, '--', label=f'Gaussian fit 1/e$^2$ radius = {fitted_radius_gauss:.2f} mm')
+            plt.plot(x_positions, gaussian_model, ':', label=f'Gaussian from divergence radius = {fitted_radius:.2f} mm')
+            plt.xlabel('x [mm]' if pixel_size != 1.0 else 'x [px]')
+            plt.ylabel('Intensity')
+            plt.title(f'Cross-section at selected distance {selected_distance:.1f} mm')
+            plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=1)
+            plt.subplots_adjust(bottom=0.25)
+            plt.grid(True, alpha=0.3)
+            plt.savefig(Path(path) / f'cross_section_gaussian_fit_distance_{selected_distance:.0f}mm.jpg', dpi=1000, bbox_inches='tight')
+            plt.close()
+        
+
 
 
 
