@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     # Make sure to adjust the path according to your file location
     # Get all files from the specified directory
-    path = r'C:\Users\komor\OneDrive - Wojskowa Akademia Techniczna\Pomiary\Łącze THz\Ogniska soczewek - PM4'
+    path = r'D:\OneDrive - Wojskowa Akademia Techniczna\Pomiary\Łącze THz\Ogniska soczewek - PM4'
     
     plotting = False  # Set to True to enable per-file plotting, False to disable
 
