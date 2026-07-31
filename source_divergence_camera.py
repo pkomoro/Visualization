@@ -5,11 +5,16 @@ import pathlib
 import re
 from scipy.optimize import curve_fit
 
+def gaussian_2d(coordinates, amplitude, x0, y0, sigma_x, sigma_y, offset):
+                    x, y = coordinates
+                    exponent = -(((x - x0) ** 2) / (2 * sigma_x ** 2) + ((y - y0) ** 2) / (2 * sigma_y ** 2))
+                    return offset + amplitude * np.exp(exponent)
+
 if __name__ == "__main__":
 
 
     # path to the folder containing .npy files
-    path ="C:\\Users\\komor\\OneDrive - Wojskowa Akademia Techniczna\\Pomiary\\Łącze THz\\Terasense 90 mW"
+    path ="D:\\OneDrive - Wojskowa Akademia Techniczna\\Pomiary\\Łącze THz\\Terasense 90 mW"
 
     
     paths = [f for f in Path(path).glob("*.npy")]
@@ -17,6 +22,7 @@ if __name__ == "__main__":
     print(*paths, sep='\n')
 
     ploting = True
+    plotting_2D_gauss = False
 
     l = 3.21  # mm, wavelength of the beam
     w0 = 7.04  # mm, beam waist radius
@@ -122,8 +128,8 @@ if __name__ == "__main__":
 
         for k in range(len(data[j])):           
             threshold = 1/np.e**2 * np.mean(np.sort(data[j][k].flatten())[-500:])
-            radii[j][k] = np.sqrt(np.sum(data[j][k] > threshold) * 2.25 / np.pi)
-        
+            radii[j][k] = np.sqrt(np.sum(data[j][k] > threshold) * pixel_size ** 2 / np.pi)
+        print(threshold)
     
     if ploting:
         combined_distances = np.concatenate(distances)
@@ -149,9 +155,6 @@ if __name__ == "__main__":
 
         plt.text(sorted_distances[-5], fit_line(sorted_distances[-5]), '$1/e^2$ diameter', va='bottom', ha='right', fontsize=11, color='cyan')
 
-        
-
-
         plt.savefig(Path(path) / 'divergence_plot.jpg', dpi=1000, bbox_inches='tight')
         plt.savefig(Path(path) / 'divergence_plot.svg', bbox_inches='tight')
         plt.close()
@@ -170,7 +173,7 @@ if __name__ == "__main__":
         sorted_distances = np.sort(combined_distances)
 
         
-        plt.plot(combined_distances, combined_radii, 'o', markersize=4, label='Data')
+        plt.plot(combined_distances, combined_radii, 'o:', markersize=4, label='Data')
         plt.plot(sorted_distances, fitted_radii, '--', color='cyan', linewidth=2, label='Linear fit')
         # plot vertical dotted lines at specified z positions (mm)
         for z_vert in (185, 325, 465):
@@ -259,12 +262,174 @@ if __name__ == "__main__":
             plt.grid(True, alpha=0.3)
             plt.savefig(Path(path) / f'cross_section_gaussian_fit_distance_{selected_distance:.0f}mm.jpg', dpi=1000, bbox_inches='tight')
             plt.close()
+
+            if plotting_2D_gauss:
+                # fit 2D Gaussian profile to the selected image
+                y_pixels = np.arange(selected_image.shape[0])
+                x_pixels = np.arange(selected_image.shape[1])
+                x_positions_2d = x_pixels * pixel_size
+                y_positions_2d = y_pixels * pixel_size
+                x_mesh, y_mesh = np.meshgrid(x_positions_2d, y_positions_2d)
+
+                
+
+                amplitude_guess_2d = selected_image.max() - selected_image.min()
+                offset_guess_2d = selected_image.min()
+                x0_guess_2d = x_center
+                y0_guess_2d = y_max_idx * pixel_size
+                sigma_x_guess_2d = fitted_radius / 2 if fitted_radius > 0 else 1.0
+                sigma_y_guess_2d = sigma_x_guess_2d
+
+                try:
+                    popt2d, _ = curve_fit(
+                        gaussian_2d,
+                        (x_mesh.ravel(), y_mesh.ravel()),
+                        selected_image.ravel(),
+                        p0=[amplitude_guess_2d, x0_guess_2d, y0_guess_2d, sigma_x_guess_2d, sigma_y_guess_2d, offset_guess_2d],
+                        bounds=(
+                            [0, x_positions_2d[0], y_positions_2d[0], 0, 0, -np.inf],
+                            [np.inf, x_positions_2d[-1], y_positions_2d[-1], np.inf, np.inf, np.inf],
+                        ),
+                        maxfev=20000,
+                    )
+                    amplitude_2d, x0_2d, y0_2d, sigma_x_2d, sigma_y_2d, offset_2d = popt2d
+                    fitted_image_2d = gaussian_2d((x_mesh, y_mesh), *popt2d).reshape(selected_image.shape)
+                except Exception:
+                    amplitude_2d = amplitude_guess_2d
+                    x0_2d = x0_guess_2d
+                    y0_2d = y0_guess_2d
+                    sigma_x_2d = sigma_x_guess_2d
+                    sigma_y_2d = sigma_y_guess_2d
+                    offset_2d = offset_guess_2d
+                    fitted_image_2d = gaussian_2d((x_mesh, y_mesh), amplitude_2d, x0_2d, y0_2d, sigma_x_2d, sigma_y_2d, offset_2d).reshape(selected_image.shape)
+
+                
+                # Center images around 0 and fill with 0 up to ±80 pixels
+                center_pixel_range = 80
+                center_y = selected_image.shape[0] // 2
+                center_x = selected_image.shape[1] // 2
+                y_start = max(0, center_y - center_pixel_range)
+                y_end = min(selected_image.shape[0], center_y + center_pixel_range)
+                x_start = max(0, center_x - center_pixel_range)
+                x_end = min(selected_image.shape[1], center_x + center_pixel_range)
+                
+                selected_image_centered = np.zeros((2 * center_pixel_range, 2 * center_pixel_range))
+                fitted_image_2d_centered = np.zeros((2 * center_pixel_range, 2 * center_pixel_range))
+                
+                y_offset = center_pixel_range - (center_y - y_start)
+                x_offset = center_pixel_range - (center_x - x_start)
+                y_size = y_end - y_start
+                x_size = x_end - x_start
+                
+                selected_image_centered[y_offset:y_offset + y_size, x_offset:x_offset + x_size] = selected_image[y_start:y_end, x_start:x_end]
+                fitted_image_2d_centered[y_offset:y_offset + y_size, x_offset:x_offset + x_size] = fitted_image_2d[y_start:y_end, x_start:x_end]
+                
+                plt.figure(figsize=(10, 4))
+                plt.subplot(1, 2, 1)
+                plt.imshow(selected_image_centered, cmap='inferno', aspect='auto', extent=[-80, 80, -80, 80])
+                plt.title('Selected image (centered)')
+                plt.colorbar()
+                plt.xlabel('Pixels')
+                plt.ylabel('Pixels')
+
+                plt.subplot(1, 2, 2)
+                plt.imshow(fitted_image_2d_centered, cmap='inferno', aspect='auto', extent=[-80, 80, -80, 80])
+                plt.title('2D Gaussian fit (centered)')
+                plt.colorbar()
+                plt.xlabel('Pixels')
+                plt.ylabel('Pixels')
+
+                plt.suptitle(
+                    f'2D Gaussian fit at distance {selected_distance:.1f} mm, '
+                    f'2sigma_x={2*sigma_x_2d:.2f} mm, 2sigma_y={2*sigma_y_2d:.2f} mm'
+                )
+                plt.savefig(Path(path) / f'selected_image_2d_gaussian_fit_distance_{selected_distance:.0f}mm.jpg', dpi=1000, bbox_inches='tight')
+                plt.close()
         
 
+
+
+        
+
+        # New: fit 2D gaussian to every frame to obtain 1/e^2 radii and plot divergence
+        all_dist = []
+        all_radii_2d = []
+        for j in range(len(paths)):
+            pixel_size = pixel_sizes[j]
+            for k in range(len(data[j])):
+                img = data[j][k]
+                y_pixels = np.arange(img.shape[0])
+                x_pixels = np.arange(img.shape[1])
+                x_positions_2d = x_pixels * pixel_size
+                y_positions_2d = y_pixels * pixel_size
+                x_mesh, y_mesh = np.meshgrid(x_positions_2d, y_positions_2d)
+
+                amplitude_guess_2d = img.max() - img.min()
+                offset_guess_2d = img.min()
+                # center guesses
+                x0_guess_2d = x_positions_2d[img.shape[1]//2]
+                y0_guess_2d = y_positions_2d[img.shape[0]//2]
+                sigma_guess = radii[j][k] / 2 if radii[j][k] > 0 else 1.0
+
+                try:
+                    popt2d, _ = curve_fit(
+                        gaussian_2d,
+                        (x_mesh.ravel(), y_mesh.ravel()),
+                        img.ravel(),
+                        p0=[amplitude_guess_2d, x0_guess_2d, y0_guess_2d, sigma_guess, sigma_guess, offset_guess_2d],
+                        bounds=(
+                            [0, x_positions_2d[0], y_positions_2d[0], 0, 0, -np.inf],
+                            [np.inf, x_positions_2d[-1], y_positions_2d[-1], np.inf, np.inf, np.inf],
+                        ),
+                        maxfev=10000,
+                    )
+                    _, _, _, sigma_x_fit, sigma_y_fit, _ = popt2d
+                    radius_1e2 = 2 * sigma_x_fit
+                except Exception:
+                    # fallback to previous geometric area method
+                    radius_1e2 = radii[j][k]
+                    print(f"Warning: 2D Gaussian fit failed for frame {k} at distance {distances[j][k]:.1f} mm, using geometric area radius instead.")
+
+                all_dist.append(distances[j][k])
+                all_radii_2d.append(radius_1e2)
+
+        all_dist = np.array(all_dist)
+        all_radii_2d = np.array(all_radii_2d)
+
+        # fit linear divergence
+        coeffs = np.polyfit(all_dist, all_radii_2d, 1)
+        fit_line = np.poly1d(coeffs)
+        angle_deg = np.degrees(np.arctan(coeffs[0]))
+
+        print(f'Fit line: y = {coeffs[0]:.4f}x + {coeffs[1]:.4f}')
+        print(f'Fit angle: {angle_deg:.4f} degrees')
+
+        # plot
+        plt.figure(figsize=(6,4))
+        sorted_idx = np.argsort(all_dist)
+        plt.plot(all_dist, all_radii_2d, 'o:', markersize=3, label='2D fit radii')
+        plt.plot(all_dist[sorted_idx], fit_line(all_dist[sorted_idx]), '--', color='cyan', linewidth=2, label=f'Linear fit, theta={angle_deg:.2f}°')
+        for z_vert in (185, 325, 465):
+            plt.axvline(x=z_vert, color='black', linestyle=':', linewidth=1)
+        plt.text(0.7, 0.95, f'$\\theta = {angle_deg:.2f}°$', transform=plt.gca().transAxes,
+                 va='top', color='black', fontsize=11)
+        plt.xlabel('Distance (mm)')
+        plt.ylabel('1/e^2 diameter (mm)')
+        plt.title('Divergence from 2D Gaussian fits')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.savefig(Path(path) / 'divergence_2d_fits_plot.jpg', dpi=1000, bbox_inches='tight')
+        plt.close()
 
 
 
    
 
     
+
+
+
+
+
+
 
