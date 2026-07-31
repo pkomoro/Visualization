@@ -353,7 +353,8 @@ if __name__ == "__main__":
 
         # New: fit 2D gaussian to every frame to obtain 1/e^2 radii and plot divergence
         all_dist = []
-        all_radii_2d = []
+        all_radii_2dx = []
+        all_radii_2dy = []
         for j in range(len(paths)):
             pixel_size = pixel_sizes[j]
             for k in range(len(data[j])):
@@ -384,35 +385,51 @@ if __name__ == "__main__":
                         maxfev=10000,
                     )
                     _, _, _, sigma_x_fit, sigma_y_fit, _ = popt2d
-                    radius_1e2 = 2 * sigma_x_fit
+                    radius_1e2_x = 2 * sigma_x_fit
+                    radius_1e2_y = 2 * sigma_y_fit
+
                 except Exception:
                     # fallback to previous geometric area method
-                    radius_1e2 = radii[j][k]
+                    radius_1e2_x = radii[j][k]
+                    radius_1e2_y = radii[j][k]
                     print(f"Warning: 2D Gaussian fit failed for frame {k} at distance {distances[j][k]:.1f} mm, using geometric area radius instead.")
 
                 all_dist.append(distances[j][k])
-                all_radii_2d.append(radius_1e2)
-
+                all_radii_2dx.append(radius_1e2_x)
+                all_radii_2dy.append(radius_1e2_y)
         all_dist = np.array(all_dist)
-        all_radii_2d = np.array(all_radii_2d)
+        all_radii_2dx = np.array(all_radii_2dx)
+        all_radii_2dy = np.array(all_radii_2dy)
 
+        plt.figure(figsize=(6,4))
         # fit linear divergence
-        coeffs = np.polyfit(all_dist, all_radii_2d, 1)
+        coeffs = np.polyfit(all_dist, all_radii_2dx, 1)
         fit_line = np.poly1d(coeffs)
         angle_deg = np.degrees(np.arctan(coeffs[0]))
 
-        print(f'Fit line: y = {coeffs[0]:.4f}x + {coeffs[1]:.4f}')
+        print(f'Fit line x: y = {coeffs[0]:.4f}x + {coeffs[1]:.4f}')
         print(f'Fit angle: {angle_deg:.4f} degrees')
 
-        # plot
-        plt.figure(figsize=(6,4))
         sorted_idx = np.argsort(all_dist)
-        plt.plot(all_dist, all_radii_2d, 'o:', markersize=3, label='2D fit radii')
+        plt.plot(all_dist, all_radii_2dx, 'o:', markersize=3, label='2D fit radii (X)')
         plt.plot(all_dist[sorted_idx], fit_line(all_dist[sorted_idx]), '--', color='cyan', linewidth=2, label=f'Linear fit, theta={angle_deg:.2f}°')
+
+        # fit linear divergence
+        coeffs = np.polyfit(all_dist, all_radii_2dy, 1)
+        fit_line = np.poly1d(coeffs)
+        angle_deg = np.degrees(np.arctan(coeffs[0]))
+
+        print(f'Fit line y: y = {coeffs[0]:.4f}x + {coeffs[1]:.4f}')
+        print(f'Fit angle: {angle_deg:.4f} degrees')
+
+        sorted_idx = np.argsort(all_dist)
+        plt.plot(all_dist, all_radii_2dy, 'o:', markersize=3, label='2D fit radii (Y)')
+        plt.plot(all_dist[sorted_idx], fit_line(all_dist[sorted_idx]), '--', color='magenta', linewidth=2, label=f'Linear fit, theta={angle_deg:.2f}°')
+        
+
         for z_vert in (185, 325, 465):
             plt.axvline(x=z_vert, color='black', linestyle=':', linewidth=1)
-        plt.text(0.7, 0.95, f'$\\theta = {angle_deg:.2f}°$', transform=plt.gca().transAxes,
-                 va='top', color='black', fontsize=11)
+        
         plt.xlabel('Distance (mm)')
         plt.ylabel('1/e^2 diameter (mm)')
         plt.title('Divergence from 2D Gaussian fits')
