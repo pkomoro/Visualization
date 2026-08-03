@@ -53,7 +53,7 @@ def Kirchhoff_integral(r, theta, z, zs, f, ws, l, a):
 
 # Source parameters
 wavelength = 3.21  # wavelength in mm
-source_waist = 7.04 # mm for WR10 small cone
+source_waist = 5.1 # mm for WR10 small cone
 optics_diameter = 187  # diameter of the lenses in mm
 P0 = 93.45  # mW, source power
 
@@ -81,7 +81,7 @@ def compute_mse(params):
             
             focal_length_adjusted = focal_length * focal_length_scaling_factor
             
-            path = "C:/Users/komor/OneDrive - Wojskowa Akademia Techniczna/Pomiary/Łącze THz/Ogniska soczewek - kamera"
+            path = "D:/OneDrive - Wojskowa Akademia Techniczna/Pomiary/Łącze THz/Ogniska soczewek - kamera"
             paths = [f for f in Path(path).glob("f" + str(focal_length_import) + "*.npy")]
             
             if not paths:
@@ -173,7 +173,7 @@ def compute_mse(params):
 
             theoretical_image_positions_gaussian = gaussian_lens_equation(object_positions, focal_length_adjusted, source_waist_adjusted, wavelength)
             
-            waist_analysis = False  # Set to True for waist analysis, False for image position analysis
+            waist_analysis = True  # Set to True for waist analysis, False for image position analysis
 
             if waist_analysis:
                 for dis in object_positions:
@@ -221,6 +221,9 @@ def compute_mse(params):
                 if waist_analysis:
                     mse_waist = np.mean((waist_array[valid_mask] - Kirchhoff_waist_array[valid_mask])**2 / waist_array[valid_mask]**2)
                     total_mse += mse_waist
+
+                    mse_image_positions = np.mean((image_positions_array[valid_mask] - Gauss_image_positions_array[valid_mask])**2 / image_positions_array[valid_mask]**2)
+                    total_mse += mse_image_positions
                 else:
                     mse_image_positions = np.mean((image_positions_array[valid_mask] - Gauss_image_positions_array[valid_mask])**2 / image_positions_array[valid_mask]**2)
                     total_mse += mse_image_positions
@@ -234,16 +237,18 @@ def compute_mse(params):
     
 if __name__ == '__main__':
 
-    path = "C:/Users/komor/OneDrive - Wojskowa Akademia Techniczna/Pomiary/Łącze THz/Ogniska soczewek - kamera"
+    path = "D:/OneDrive - Wojskowa Akademia Techniczna/Pomiary/Łącze THz/Ogniska soczewek - kamera"
 
     
-    bounds = [(0, 20), (0.95, 1), (0.65, 0.65), (0.61, 0.61)]  # bounds for source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, and diameter_reduction
-    # bounds = [(1.75, 1.75), (0.98, 0.98), (0.5, 0.7), (0.5, 0.7)]  # bounds for source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, and diameter_reduction
+    # bounds = [(-5, 10), (0.97, 1), (1, 1), (0.605, 0.605)]  # bounds for source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, and diameter_reduction
+    # bounds = [(-2.5, -2.5), (0.9925, 0.9925), (0.6, 1), (0.5, 0.8)]  # bounds for source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, and diameter_reduction
+    bounds = [(0, 5), (0.98, 0.99), (0.85, 0.95), (0.6, 0.7)]  # bounds for source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, and diameter_reduction
 
 
     # grid resolution for each parameter (can be adjusted)
-    grid_points = (81, 41, 1, 1)  # number of points for source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, and diameter_reduction
+    # grid_points = (31, 41, 1, 1)  # number of points for source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, and diameter_reduction
     # grid_points = (1, 1, 41, 41)  # number of points for source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, and diameter_reduction
+    grid_points = (6, 11, 11, 11)  # number of points for source_distance_shift, focal_length_scaling_factor, source_waist_scaling_factor, and diameter_reduction
 
     grids = [np.linspace(b[0], b[1], n) for b, n in zip(bounds, grid_points)]
     

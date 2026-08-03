@@ -52,14 +52,14 @@ if __name__ == "__main__":
 
     # Source parameters
     wavelength = 3.21  # wavelength in mm
-    source_waist = 7.04 # mm for WR10 small cone
+    source_waist = 5.1 # mm for WR10 small cone
     optics_diameter = 187  # diameter of the lenses in mm
     P0 = 93.45  # mW, source power
 
     lens_thickness = 2  # mm, thickness of the lens
 
     # focal_length = 118  # mm, adjust based on your lens
-    for focal_length in [180]:  # mm, focal lengths of the lenses used in the experiment
+    for focal_length in [118]:  # mm, focal lengths of the lenses used in the experiment
 
         
         # source_distance_shift = 8.5
@@ -167,10 +167,10 @@ if __name__ == "__main__":
 
         '''Corrected signs in gaussian_lens_equation'''
         # 180 mm image position + waist scalling
-        source_distance_shift = 15.75
-        focal_length_scaling_factor = 0.965
-        source_waist_scaling_factor = 0.62
-        diameter_reduction = 0.72
+        # source_distance_shift = 15.75
+        # focal_length_scaling_factor = 0.965
+        # source_waist_scaling_factor = 0.62
+        # diameter_reduction = 0.72
 
         # 158 mm image position + waist scalling
         # source_distance_shift = 4.0
@@ -183,6 +183,14 @@ if __name__ == "__main__":
         # focal_length_scaling_factor = 0.98375
         # source_waist_scaling_factor = 0.65
         # diameter_reduction = 0.61
+
+        '''New waist and source divergence -  2D gaussian fit 11.4 degrees'''
+
+        # 118 mm image position + waist scalling
+        source_distance_shift = 2
+        focal_length_scaling_factor = 0.983
+        source_waist_scaling_factor = 0.87
+        diameter_reduction = 0.61
 
 
         lens_source_distance = 210 - source_distance_shift  # mm, distance from the source to the lens derived from positions on the rail (metadane)
@@ -201,14 +209,14 @@ if __name__ == "__main__":
 
 
         # path to the folder containing .npy files
-        path ="C:/Users/komor/OneDrive - Wojskowa Akademia Techniczna/Pomiary/Łącze THz/Ogniska soczewek - kamera"
+        path ="D://OneDrive - Wojskowa Akademia Techniczna/Pomiary/Łącze THz/Ogniska soczewek - kamera"
 
         paths = [f for f in Path(path).glob("f" + str(focal_length) + "*.npy")]
 
         # print(*paths, sep='\n')
 
         ploting = False
-        ploting_waist = True
+        ploting_waist = False
         
 
         paths_meta = [f for f in Path(path).glob("*.meta")]
