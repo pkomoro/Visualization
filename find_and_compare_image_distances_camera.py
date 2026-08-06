@@ -1,9 +1,10 @@
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib.patches import Circle
+from matplotlib.patches import Circle, Ellipse
 from pathlib import Path
 import pathlib
 import re
+from scipy.optimize import curve_fit
 
 from methods import GaussianBeam, Lens
 
@@ -48,11 +49,17 @@ def Kirchhoff_integral(r, theta, z, zs, f, ws, l, a):
 
     return U
 
+def gaussian_2d(coordinates, amplitude, x0, y0, sigma_x, sigma_y, offset):
+                    x, y = coordinates
+                    exponent = -(((x - x0) ** 2) / (2 * sigma_x ** 2) + ((y - y0) ** 2) / (2 * sigma_y ** 2))
+                    return amplitude * np.exp(exponent)
+
 if __name__ == "__main__":
 
     # Source parameters
     wavelength = 3.21  # wavelength in mm
-    source_waist = 5.1 # mm for WR10 small cone
+    source_waist_x = 5.1 # mm for WR10 small cone
+    source_waist_y = 6.1 # mm for WR10 small cone
     optics_diameter = 187  # diameter of the lenses in mm
     P0 = 93.45  # mW, source power
 
@@ -187,10 +194,18 @@ if __name__ == "__main__":
         '''New waist and source divergence -  2D gaussian fit 11.4 degrees'''
 
         # 118 mm image position + waist scalling
-        source_distance_shift = 2
-        focal_length_scaling_factor = 0.983
-        source_waist_scaling_factor = 0.87
-        diameter_reduction = 0.61
+        # source_distance_shift = 2
+        # focal_length_scaling_factor = 0.983
+        # source_waist_scaling_factor = 0.87
+        # diameter_reduction = 0.61
+
+
+        '''New waist and source divergence -  2D gaussian fit 11.4 degrees - separation of x and y axis'''
+        # 118 mm image position + waist scalling
+        source_distance_shift = 0
+        focal_length_scaling_factor = 1
+        source_waist_scaling_factor = 1
+        diameter_reduction = 1
 
 
         lens_source_distance = 210 - source_distance_shift  # mm, distance from the source to the lens derived from positions on the rail (metadane)
@@ -205,18 +220,19 @@ if __name__ == "__main__":
 
         focal_length_adjusted = focal_length * focal_length_scaling_factor  # mm, adjusted focal length for theoretical calculations
 
-        source_waist_adjusted = source_waist * source_waist_scaling_factor  # mm, adjusted source waist for theoretical calculations
+        source_waist_x_adjusted = source_waist_x * source_waist_scaling_factor  # mm, adjusted source waist for theoretical calculations
+        source_waist_y_adjusted = source_waist_y * source_waist_scaling_factor  # mm, adjusted source waist for theoretical calculations
 
 
         # path to the folder containing .npy files
-        path ="D://OneDrive - Wojskowa Akademia Techniczna/Pomiary/Łącze THz/Ogniska soczewek - kamera"
+        path ="C:/Users/komor/OneDrive - Wojskowa Akademia Techniczna/Pomiary/Łącze THz/Ogniska soczewek - kamera"
 
         paths = [f for f in Path(path).glob("f" + str(focal_length) + "*.npy")]
 
         # print(*paths, sep='\n')
 
         ploting = False
-        ploting_waist = False
+        ploting_waist = True
         
 
         paths_meta = [f for f in Path(path).glob("*.meta")]
@@ -248,15 +264,23 @@ if __name__ == "__main__":
         ax.set_facecolor('black')
 
         radii = [np.zeros(len(data[i])) for i in range(len(data))]
+        all_radii_2dx = [np.zeros(len(data[i])) for i in range(len(data))]
+        all_radii_2dy = [np.zeros(len(data[i])) for i in range(len(data))]
+        all_centers_2dx = [np.zeros(len(data[i])) for i in range(len(data))]
+        all_centers_2dy = [np.zeros(len(data[i])) for i in range(len(data))]
         max_intensity = [np.zeros(len(data[i])) for i in range(len(data))]
         distances = [np.zeros(len(data[i])) for i in range(len(data))]
 
         image_positions = [0 for i in range(len(data))]
         image_positions2 = [0 for i in range(len(data))]
         image_positions3 = [0 for i in range(len(data))]
+        image_positions_gauss2dx = [0 for i in range(len(data))]
+        image_positions_gauss2dy = [0 for i in range(len(data))]
         object_positions = [0 for i in range(len(data))]
 
         waist = [0 for i in range(len(data))]
+        waist_gauss2dx = [0 for i in range(len(data))]
+        waist_gauss2dy = [0 for i in range(len(data))]
 
         for j in range(len(paths)):
                 
@@ -273,12 +297,26 @@ if __name__ == "__main__":
             object_positions[j] = lens_d - lens_source_distance # mm, distance from the object (source) to the lens derived from positions on the rail (metadane)
             z0 = total_distance - object_positions[j] - lens_thickness  # mm, distance from the lens to the camera derived from positions on the rail (metadane)
             
+            pixel_size_match = re.search(r"Pixel size[: ]*\s*([0-9]*\.?[0-9]+)", data_meta[j])
+            pixel_size = float(pixel_size_match.group(1)) if pixel_size_match else 1.0
             
             index = data_meta[j].find("Camera exposure setting:")
             data_meta[j] = data_meta[j][(index+25):]
 
             index = data_meta[j].find("Pixel size")
             exposure = int(data_meta[j][:(index-1)])
+
+            index = data_meta[j].find("Start X")
+            data_meta[j] = data_meta[j][(index+9):]
+
+            index = data_meta[j].find("mm")
+            x_start = float(data_meta[j][:(index-1)])
+
+            index = data_meta[j].find("Stop X")
+            data_meta[j] = data_meta[j][(index+8):]
+
+            index = data_meta[j].find("mm")
+            x_stop = float(data_meta[j][:(index-1)])
 
             index = data_meta[j].find("Start Y")
             data_meta[j] = data_meta[j][(index+9):]
@@ -331,10 +369,55 @@ if __name__ == "__main__":
             ax.set_ylim(-24, 24)
 
             for k in range(len(data[j])):
-
+                # Calculate the 1/e^2 radius based on the geometric area method
                 threshold = 1/np.e**2 * np.mean(np.sort(data[j][k].flatten())[-2:])
                 radii[j][k] = np.sqrt(np.sum(data[j][k] > threshold) * 2.25 / np.pi)
                 max_intensity[j][k] = np.max(data[j][k])
+
+                # Fit a 2D Gaussian to the image
+                img = data[j][k]
+                y_pixels = np.arange(img.shape[0])
+                x_pixels = np.arange(img.shape[1])
+                x_positions_2d = x_pixels * pixel_size
+                y_positions_2d = y_pixels * pixel_size
+                x_mesh, y_mesh = np.meshgrid(x_positions_2d, y_positions_2d)
+
+                amplitude_guess_2d = img.max() - img.min()
+                offset_guess_2d = img.min()
+                # center guesses
+                x0_guess_2d = x_positions_2d[img.shape[1]//2]
+                y0_guess_2d = y_positions_2d[img.shape[0]//2]
+                sigma_guess = radii[j][k] / 2 if radii[j][k] > 0 else 1.0
+
+                try:
+                    popt2d, _ = curve_fit(
+                        gaussian_2d,
+                        (x_mesh.ravel(), y_mesh.ravel()),
+                        img.ravel(),
+                        p0=[amplitude_guess_2d, x0_guess_2d, y0_guess_2d, sigma_guess, sigma_guess, offset_guess_2d],
+                        bounds=(
+                            [0, x_positions_2d[0], y_positions_2d[0], 0, 0, -np.inf],
+                            [np.inf, x_positions_2d[-1], y_positions_2d[-1], np.inf, np.inf, np.inf],
+                        ),
+                        maxfev=10000,
+                    )
+                    _, x0_fit, y0_fit, sigma_x_fit, sigma_y_fit, _ = popt2d
+                    all_radii_2dx[j][k] = 2 * sigma_x_fit
+                    all_radii_2dy[j][k] = 2 * sigma_y_fit
+                    all_centers_2dx[j][k] = x0_fit
+                    all_centers_2dy[j][k] = y0_fit
+
+                except Exception:
+                    # fallback to previous geometric area method
+                    all_radii_2dx[j][k] = radii[j][k]
+                    all_radii_2dy[j][k] = radii[j][k]
+                    all_centers_2dx[j][k] = x0_guess_2d
+                    all_centers_2dy[j][k] = y0_guess_2d
+                    print(f"Warning: 2D Gaussian fit failed for frame {k} at distance {distances[j][k]:.1f} mm, using geometric area radius instead.")
+
+                
+                
+
             
             if ploting:
                 plt.savefig(paths[j] + '_xz_y' + str(y) + 'px.jpg', dpi = 300, bbox_inches='tight')
@@ -343,16 +426,42 @@ if __name__ == "__main__":
 
             
 
-            # Fit a line to the data
-            coefficients = np.polyfit(distances[j], radii[j], 11)
-            fit_line = np.poly1d(coefficients)
-            fitted_radii = fit_line(distances[j])
-            # angle_deg = np.degrees(np.arctan(coefficients[0]))
-            waist[j] = np.min(fitted_radii)
-
-            image_positions[j] = distances[j][np.argmin(fitted_radii)]
+            
             image_positions2[j] = distances[j][np.argmin(radii[j])]
             image_positions3[j] = distances[j][np.argmax(max_intensity[j])]
+
+            fit_range = 50
+            fit_order = 10
+            # Fit a line to the data
+            min_radius_index = np.argmin(all_radii_2dx[j])
+            fit_start_2dx = max(0, min_radius_index - fit_range)
+            fit_end_2dx = min(len(distances[j]), min_radius_index + fit_range)
+            print(f"Fitting range for 2D Gaussian fit (X): {fit_start_2dx} to {fit_end_2dx}")
+            print(f"Distances for fitting (X): {len(distances[j][fit_start_2dx:fit_end_2dx])}, Radii for fitting (X): {len(all_radii_2dx[j][fit_start_2dx:fit_end_2dx])}")
+            coefficients = np.polyfit(distances[j][fit_start_2dx:fit_end_2dx], all_radii_2dx[j][fit_start_2dx:fit_end_2dx], fit_order)
+            fit_line = np.poly1d(coefficients)
+            fitted_radii_2dx = fit_line(distances[j][fit_start_2dx:fit_end_2dx])
+            waist_gauss2dx[j] = np.min(fitted_radii_2dx)
+            image_positions_gauss2dx[j] = distances[j][fit_start_2dx + np.argmin(fitted_radii_2dx)]
+
+            min_radius_index = np.argmin(all_radii_2dy[j])
+            fit_start_2dy = max(0, min_radius_index - fit_range)
+            fit_end_2dy = min(len(distances[j]), min_radius_index + fit_range)
+            coefficients = np.polyfit(distances[j][fit_start_2dy:fit_end_2dy], all_radii_2dy[j][fit_start_2dy:fit_end_2dy], fit_order)
+            fit_line = np.poly1d(coefficients)
+            fitted_radii_2dy = fit_line(distances[j][fit_start_2dy:fit_end_2dy])
+            waist_gauss2dy[j] = np.min(fitted_radii_2dy)
+            image_positions_gauss2dy[j] = distances[j][fit_start_2dy + np.argmin(fitted_radii_2dy)]
+
+            min_radius_index = np.argmin(radii[j])
+            fit_start = max(0, min_radius_index - fit_range)
+            fit_end = min(len(distances[j]), min_radius_index + fit_range)
+            coefficients = np.polyfit(distances[j][fit_start:fit_end], radii[j][fit_start:fit_end], fit_order)
+            fit_line = np.poly1d(coefficients)
+            fitted_radii = fit_line(distances[j][fit_start:fit_end])
+            waist[j] = np.min(fitted_radii)
+            image_positions[j] = distances[j][fit_start + np.argmin(fitted_radii)]
+
 
             print(f"Lens position: {lens_d} mm, Object position: {object_positions[j]:.2f} mm, Image position (fit): {image_positions[j]:.2f} mm, Image position (min radius): {image_positions2[j]:.2f} mm, Image position (max intensity): {image_positions3[j]:.2f} mm, Waist: {waist[j]:.2f} mm")
 
@@ -360,11 +469,15 @@ if __name__ == "__main__":
             if ploting:
                 plt.figure()
                 plt.plot(distances[j], radii[j], 'o-', label='Measured $1/e^2$ radius', markersize=4)
-                # plt.plot(distances[j], fitted_radii, 'r--', label=f'Fit: {angle_deg:.2f}°')
-                plt.plot(distances[j], fitted_radii, 'r--', label='Polynomial fit')
+                plt.plot(distances[j], all_radii_2dx[j], 's-', label='2D Gaussian fit (X)', markersize=4)
+                plt.plot(distances[j], all_radii_2dy[j], '^-', label='2D Gaussian fit (Y)', markersize=4)
+                plt.plot(distances[j][fit_start_2dx:fit_end_2dx], fitted_radii_2dx, 'r--', label='Polynomial fit (X)')
+                plt.plot(distances[j][fit_start_2dy:fit_end_2dy], fitted_radii_2dy, 'm--', label='Polynomial fit (Y)')
+                plt.plot(distances[j][fit_start:fit_end], fitted_radii, 'b--', label='Polynomial fit (Geometric area)')
                 plt.legend()
                 plt.xlabel('Distance [mm]')
                 plt.ylabel(r'$1/e^2$ radius [mm]')
+                plt.ylim(0, 30)
 
                 # plt.title('Divergence of the beam')
         
@@ -382,19 +495,40 @@ if __name__ == "__main__":
                 #     vmax_change = 0.1
                 #     circle_shift = -5
 
-                plt.figure()
-                plt.imshow(data[j][np.argmin(fitted_radii) + shift], cmap='inferno', aspect = 'auto',
-                        extent=[y_start - (y_start + y_stop)/2, y_stop - (y_start + y_stop)/2, y_start - (y_start + y_stop)/2, y_stop - (y_start + y_stop)/2], vmin = 0, vmax = vmax * vmax_change)
-
-                waist_radius = np.min(fitted_radii)
-                waist_radius = fitted_radii[np.argmin(fitted_radii) + shift]
-                circle = Circle((circle_shift, 0), waist_radius, edgecolor='cyan', facecolor='none', linewidth=1.5)
-                plt.gca().add_patch(circle)
+                fig, axes = plt.subplots(1, 2, figsize=(12, 5))
                 
-                # plt.title(f'Beam waist at z = {image_positions[j]:.2f} mm')
-                plt.xlabel('x [mm]')
-                plt.ylabel('y [mm]')
-                plt.colorbar(label='Intensity [a.u.]')
+                # Position indices for X and Y
+                position_index_2dx = int(fit_start_2dx + np.argmin(fitted_radii_2dx) + shift)
+                position_index_2dy = int(fit_start_2dy + np.argmin(fitted_radii_2dy) + shift)
+
+                # show image with physical extent
+                x_start_new = x_start - (x_stop + x_start)/2
+                x_stop_new = x_stop - (x_stop + x_start)/2
+                y_start_new = y_start - (y_stop + y_start)/2
+                y_stop_new = y_stop - (y_stop + y_start)/2
+                extent = [x_start_new, x_stop_new, y_start_new, y_stop_new]
+                
+                # Plot 1: X position
+                img_2dx = data[j][position_index_2dx]
+                im1 = axes[0].imshow(img_2dx, cmap='inferno', aspect='auto', extent=extent, vmin=0, vmax=vmax * vmax_change)
+                ellipse_2dx = Ellipse((all_centers_2dx[j][position_index_2dx] + x_start_new, all_centers_2dy[j][position_index_2dx] + y_start_new), all_radii_2dx[j][position_index_2dx] * 2, all_radii_2dy[j][position_index_2dx] * 2, edgecolor='cyan', facecolor='none', linewidth=1.5)
+                axes[0].add_patch(ellipse_2dx)
+                axes[0].set_xlabel('x [mm]')
+                axes[0].set_ylabel('y [mm]')
+                axes[0].set_title('X waist position at z = {:.2f} mm'.format(distances[j][position_index_2dx]))
+                plt.colorbar(im1, ax=axes[0], label='Intensity [a.u.]')
+                
+                # Plot 2: Y position
+                img_2dy = data[j][position_index_2dy]
+                im2 = axes[1].imshow(img_2dy, cmap='inferno', aspect='auto', extent=extent, vmin=0, vmax=vmax * vmax_change)
+                ellipse_2dy = Ellipse((all_centers_2dx[j][position_index_2dy] + x_start_new, all_centers_2dy[j][position_index_2dy] + y_start_new), all_radii_2dx[j][position_index_2dy] * 2, all_radii_2dy[j][position_index_2dy] * 2, edgecolor='cyan', facecolor='none', linewidth=1.5)
+                axes[1].add_patch(ellipse_2dy)
+                axes[1].set_xlabel('x [mm]')
+                axes[1].set_ylabel('y [mm]')
+                axes[1].set_title('Y waist position at z = {:.2f} mm'.format(distances[j][position_index_2dy]))
+                plt.colorbar(im2, ax=axes[1], label='Intensity [a.u.]')
+                
+                plt.tight_layout()
                 plt.savefig(paths[j] + '_waist_plot.jpg', dpi=1000, bbox_inches='tight')
                 plt.savefig(paths[j] + '_waist_plot.svg', bbox_inches='tight')
                 plt.close()
@@ -403,21 +537,46 @@ if __name__ == "__main__":
 
     # Measured vs theoretical beam waist values
 
+        # Save experimental results for this focal length to a CSV file
+        experimental_data = np.vstack([
+            object_positions,
+            image_positions,
+            image_positions2,
+            image_positions3,
+            image_positions_gauss2dx,
+            image_positions_gauss2dy,
+            waist,
+            waist_gauss2dx,
+            waist_gauss2dy,
+        ]).T
+        experimental_data_path = Path(path) / f"f{focal_length}mm_experimental_data.csv"
+        np.savetxt(
+            experimental_data_path,
+            experimental_data,
+            delimiter=',',
+            header=('object_position_mm,image_position_fit_mm,image_position_min_radius_mm,'
+                    'image_position_max_intensity_mm,image_position_gauss2dx_mm,'
+                    'image_position_gauss2dy_mm,waist_geo_mm,waist_gauss2dx_mm,waist_gauss2dy_mm'),
+            comments=''
+        )
+
         object_positions_range = np.linspace(np.min(object_positions), np.max(object_positions), 100)  # Object positions
 
-        beam1 = GaussianBeam(wavelength, source_waist_adjusted, 0)
+        beam1x = GaussianBeam(wavelength, source_waist_x_adjusted, 0)
+        beam1y = GaussianBeam(wavelength, source_waist_y_adjusted, 0)
         lens1 = Lens(focal_length_adjusted, optics_diameter_adjusted, object_positions_range)
-        beam2 = lens1.transform(beam1)
+        beam2x = lens1.transform(beam1x)
+        beam2y = lens1.transform(beam1y)
 
-        thin_lens_waist = source_waist_adjusted * thin_lens_equation(object_positions_range, focal_length_adjusted) / object_positions_range
+        thin_lens_waist_x = source_waist_x_adjusted * thin_lens_equation(object_positions_range, focal_length_adjusted) / object_positions_range
+        thin_lens_waist_y = source_waist_y_adjusted * thin_lens_equation(object_positions_range, focal_length_adjusted) / object_positions_range
 
         # Kirchhoff integral plot 
 
         z_values = np.linspace(1 * focal_length_adjusted, 4 * focal_length_adjusted, 200)  # mm, range of z values to evaluate the Kirchhoff integral
         r_values = np.linspace(0, 24, 100)  # mm, range of r values to evaluate the Kirchhoff integral
-        Kirchhoff_waist = []
-       
-        
+        Kirchhoff_waist_x = []
+        Kirchhoff_waist_y = []
 
         for idx, dis in enumerate(range(len(object_positions))):
 
@@ -426,37 +585,15 @@ if __name__ == "__main__":
             print(f'Kirchhoff progress: {idx+1}/{len(object_positions)} -- object_pos = {object_positions[dis]:.3f} mm', end=end_char, flush=True)
 
             
-            U_values = np.array([Kirchhoff_integral(0, 0, z, -object_positions[dis], focal_length_adjusted, source_waist_adjusted, wavelength, optics_diameter_adjusted / 2) for z in z_values])
+            U_values = np.array([Kirchhoff_integral(0, 0, z, -object_positions[dis], focal_length_adjusted, source_waist_x_adjusted, wavelength, optics_diameter_adjusted / 2) for z in z_values])
             intensity = np.abs(U_values)**2
-
-            # # Plot intensity as a function of z and display
-            # plt.figure()
-            # plt.plot(z_values, intensity, '-o')
-            # plt.xlabel('z [mm]')
-            # plt.ylabel('Intensity |U(0)|^2')
-            # plt.title(f'On-axis intensity vs z (object pos {object_positions_range[dis]:.2f} mm)')
-            # plt.grid(True)
-            # plt.show()
-            # plt.close()
 
             max_value = np.max(intensity)
             max_index = np.argmax(intensity)
-            max_z = z_values[max_index]
-                        
+            max_z = z_values[max_index]      
             
-            U_values = np.array([Kirchhoff_integral(r, 0, max_z, -object_positions[dis], focal_length_adjusted, source_waist_adjusted, wavelength, optics_diameter_adjusted / 2) for r in r_values])
+            U_values = np.array([Kirchhoff_integral(r, 0, max_z, -object_positions[dis], focal_length_adjusted, source_waist_x_adjusted, wavelength, optics_diameter_adjusted / 2) for r in r_values])
             intensity = np.abs(U_values)**2
-            
-            # # Plot U_values as a function of r: amplitude and intensity
-            # plt.figure()
-            # plt.plot(r_values, intensity, label=r'Intensity $|U(r)|^2$')
-            # plt.xlabel('r [mm]')
-            # plt.ylabel('Amplitude / Intensity')
-            # plt.title(f'U(r) at object pos {object_positions_range[dis]:.2f} mm, z = {max_z:.2f} mm')
-            # plt.legend()
-            # plt.grid(True)
-            # plt.show()
-            # plt.close()
 
             # Find radius at 1/e^2 of the maximum intensity
             threshold = max_value * np.exp(-2)
@@ -475,28 +612,64 @@ if __name__ == "__main__":
             else:
                 r_1e2 = np.nan
 
-            Kirchhoff_waist.append(r_1e2)
+            Kirchhoff_waist_x.append(r_1e2)
+
+            U_values = np.array([Kirchhoff_integral(0, 0, z, -object_positions[dis], focal_length_adjusted, source_waist_y_adjusted, wavelength, optics_diameter_adjusted / 2) for z in z_values])
+            intensity = np.abs(U_values)**2
+
+            max_value = np.max(intensity)
+            max_index = np.argmax(intensity)
+            max_z = z_values[max_index]      
+            
+            U_values = np.array([Kirchhoff_integral(r, 0, max_z, -object_positions[dis], focal_length_adjusted, source_waist_y_adjusted, wavelength, optics_diameter_adjusted / 2) for r in r_values])
+            intensity = np.abs(U_values)**2
+
+            # Find radius at 1/e^2 of the maximum intensity
+            threshold = max_value * np.exp(-2)
+            below_indices = np.where(intensity <= threshold)[0]
+            if below_indices.size > 0:
+                first_below = below_indices[0]
+                if first_below > 0:
+                    r_lo, r_hi = r_values[first_below - 1], r_values[first_below]
+                    I_lo, I_hi = intensity[first_below - 1], intensity[first_below]
+                    if I_hi != I_lo:
+                        r_1e2 = r_lo + (threshold - I_lo) * (r_hi - r_lo) / (I_hi - I_lo)
+                    else:
+                        r_1e2 = r_lo
+                else:
+                    r_1e2 = r_values[first_below]
+            else:
+                r_1e2 = np.nan
+
+            Kirchhoff_waist_y.append(r_1e2)
 
             
 
 
         plt.close()
         plt.figure()
-        plt.plot(object_positions, waist, 'o-', label='Measured beam waist')
-        plt.plot(object_positions_range, beam2.waist, 'r--', label='Theoretical beam waist')
-        plt.plot(object_positions_range, thin_lens_waist, 'g-.', label='Thin lens equation')
-        plt.plot(object_positions, Kirchhoff_waist, 'b:', label='Kirchhoff integral')
+        # plt.plot(object_positions, waist, 'o-', label='Measured beam waist (Geometric area)', markersize=8)
+        plt.plot(object_positions, waist_gauss2dx, 's-', label='Measured beam waist (2D Gaussian fit X)', markersize=8)
+        plt.plot(object_positions, waist_gauss2dy, '^-', label='Measured beam waist (2D Gaussian fit Y)', markersize=8)
+        # plt.plot(object_positions_range, beam2x.waist, 'r--', label='Gaussian beam waist - x axis')
+        # plt.plot(object_positions_range, beam2y.waist, 'g--', label='Gaussian beam waist - y axis')
+        # plt.plot(object_positions_range, thin_lens_waist_x, 'r:', label='Thin lens equation - x axis')
+        # plt.plot(object_positions_range, thin_lens_waist_y, 'g:', label='Thin lens equation - y axis')
+        plt.plot(object_positions, Kirchhoff_waist_x, 'b:', label='Kirchhoff integral - x axis')
+        plt.plot(object_positions, Kirchhoff_waist_y, 'm:', label='Kirchhoff integral - y axis')
         plt.xlabel('Object Distance (mm)')   
         plt.ylabel('Beam Waist (mm)')
         plt.ylim(3, 16)
 
         # draw dashed lines for 2f and w0
         plt.axvline(2 * focal_length_adjusted, color='gray', linestyle='--', linewidth=1)
-        plt.axhline(source_waist_adjusted, color='gray', linestyle='--', linewidth=1)
+        plt.axhline(source_waist_x_adjusted, color='gray', linestyle='--', linewidth=1)
+        plt.axhline(source_waist_y_adjusted, color='gray', linestyle='--', linewidth=1)
         ylim = plt.Axes.get_ylim(plt.gca())
         xlim = plt.Axes.get_xlim(plt.gca())
         plt.text(2 * focal_length_adjusted, ylim[0], ' 2f', color='gray', ha='left', va='bottom')
-        plt.text(xlim[0], source_waist_adjusted, ' w0', color='gray', ha='left', va='bottom')
+        plt.text(xlim[0], source_waist_x_adjusted, ' w0_x', color='gray', ha='left', va='bottom')
+        plt.text(xlim[0], source_waist_y_adjusted, ' w0_y', color='gray', ha='left', va='bottom')
 
         plt.title(f'Comparison of Measured and Theoretical Beam Waist (f={focal_length} mm)')
         plt.legend()
@@ -507,18 +680,20 @@ if __name__ == "__main__":
         # Measured vs theoretical image positions
         
         plt.figure(figsize=(10, 6))
-        plt.plot(object_positions, image_positions, 'o', label='Experimental (fit)', linewidth=2, markersize=8)
-        plt.plot(object_positions, image_positions2, 'x', label='Experimental (min radius)', linewidth=2, markersize=8)
-        plt.plot(object_positions, image_positions3, '+', label='Experimental (max intensity)', linewidth=2, markersize=8)
+        # plt.plot(object_positions, image_positions, 'o-', label='Experimental (fit)', linewidth=2, markersize=8)
+        # plt.plot(object_positions, image_positions2, 'x-', label='Experimental (min radius)', linewidth=2, markersize=8)
+        # plt.plot(object_positions, image_positions3, '+-', label='Experimental (max intensity)', linewidth=2, markersize=8)
+        plt.plot(object_positions, image_positions_gauss2dx, 's-', label='Experimental (2D Gaussian fit X)', linewidth=2, markersize=8)
+        plt.plot(object_positions, image_positions_gauss2dy, '^-', label='Experimental (2D Gaussian fit Y)', linewidth=2, markersize=8)
         object_distances = np.linspace(np.min(object_positions), np.max(object_positions), 40)  # mm, range of object distances to consider
 
         # theoretical_image_positions = thin_lens_equation(object_distances, focal_length * focal_length_scale)
-        theoretical_image_positions_gaussian = gaussian_lens_equation(-object_distances, focal_length_adjusted, source_waist_adjusted, wavelength)
+        theoretical_image_positions_gaussian = gaussian_lens_equation(-object_distances, focal_length_adjusted, source_waist_x_adjusted, wavelength)
 
         # Plot comparison
             
         # plt.plot(object_distances, theoretical_image_positions, '--', label='Thin lens equation' + f' (scale: {focal_length_scale:.2f})', linewidth=2)
-        plt.plot(object_distances, theoretical_image_positions_gaussian, '--', label='Gaussian beam', linewidth=2)
+        # plt.plot(object_distances, theoretical_image_positions_gaussian, '--', label='Gaussian beam', linewidth=2)
 
         
         z_max_values = []
@@ -526,51 +701,9 @@ if __name__ == "__main__":
         a = optics_diameter_adjusted / 2  # mm, radius of the lens aperture
 
 
-        # Kirchhoff integral plot on object distance vs image distance
-
-        # for dis in range(0,100,20):
-
-        #     U_values = np.array([Kirchhoff_integral(z, -object_distances[dis], focal_length, source_waist, wavelength, a) for z in z_values])
-        #     intensity = np.abs(U_values)**2
-
-        #     max_index = np.argmax(intensity)
-        #     max_z = z_values[max_index]
-
-        #     plt.figure(figsize=(10, 6))
-        #     plt.plot(z_values, intensity, 'b--', linewidth=2, label='Intensity |U|^2')
-        #     plt.axvline(x=max_z, color='r', linestyle='--', label=f'Max at z={max_z:.2f} mm')
-        #     plt.xlabel('z (mm)')
-        #     plt.ylabel('Field / Intensity')
-        #     plt.ylim(0, 0.03)
-        #     plt.title(f'Kirchhoff Integral for zs={object_distances[dis]:.2f} mm')
-        #     plt.legend()
-        #     plt.grid(True, alpha=0.3)
-        #     plt.savefig(path + '/kirchhoff_u_values_plot_obj' + str(int(object_distances[dis])) + 'mm.jpg', dpi=300, bbox_inches='tight')
-        #     plt.close()
-
-    
-            
-        # Kirchhoff integrals for different apertures
-        # for scale in [0.25, 0.5, 1, 2, 4]:
-
-        #     a = 187 / 2  # mm, radius of the lens aperture
-        #     z_max_values = []
-
-        #     for zs in object_distances:
-        #         U_values = np.array([Kirchhoff_integral(z, -zs, focal_length, source_waist, wavelength, scale * a) for z in z_values])
-        #         intensity = np.abs(U_values)**2
-        #         max_index = np.argmax(intensity)
-        #         z_max_values.append(z_values[max_index])
-        #         processed = len(z_max_values)
-        #         total = len(object_distances)
-        #         print(f"\rKirchhoff integral progress: {processed}/{total} object distances", end="", flush=True)
-        #         if processed == total:
-        #             print()
-
-        #     plt.plot(object_distances, z_max_values, '--', label='Kirchhoff integral' + f' (scale: {scale})', linewidth=2)
         
         for zs in object_distances:
-            U_values = np.array([Kirchhoff_integral(0, 0, z, -zs, focal_length_adjusted, source_waist_adjusted, wavelength, optics_diameter_adjusted / 2) for z in z_values])
+            U_values = np.array([Kirchhoff_integral(0, 0, z, -zs, focal_length_adjusted, source_waist_x_adjusted, wavelength, optics_diameter_adjusted / 2) for z in z_values])
             intensity = np.abs(U_values)**2
             max_index = np.argmax(intensity)
             z_max_values.append(z_values[max_index])
@@ -579,16 +712,37 @@ if __name__ == "__main__":
             print(f"\rKirchhoff integral progress: {processed}/{total} object distances", end="", flush=True)
             if processed == total:
                 print()
-        plt.plot(object_distances, z_max_values, 'b--', label='Kirchhoff integral', linewidth=2)
+        plt.plot(object_distances, z_max_values, '--', label='Kirchhoff integral - x axis', linewidth=2)
+
+        z_max_values = []
+        for zs in object_distances:
+                    U_values = np.array([Kirchhoff_integral(0, 0, z, -zs, focal_length_adjusted, source_waist_y_adjusted, wavelength, optics_diameter_adjusted / 2) for z in z_values])
+                    intensity = np.abs(U_values)**2
+                    max_index = np.argmax(intensity)
+                    z_max_values.append(z_values[max_index])
+                    processed = len(z_max_values)
+                    total = len(object_distances)
+                    print(f"\rKirchhoff integral progress: {processed}/{total} object distances", end="", flush=True)
+                    if processed == total:
+                        print()
+        plt.plot(object_distances, z_max_values, '--', label='Kirchhoff integral - y axis', linewidth=2)
         
         
         plt.xlabel('Object Distance (mm)')
         plt.ylabel('Image Distance (mm)')
         plt.title('Object Positions: Experimental vs Theoretical')
+        plt.axvline(2 * focal_length_adjusted, color='gray', linestyle='--', linewidth=1)
+        plt.axhline(2 * focal_length_adjusted, color='gray', linestyle='--', linewidth=1)
+        ylim = plt.Axes.get_ylim(plt.gca())
+        xlim = plt.Axes.get_xlim(plt.gca())
+        plt.text(2 * focal_length_adjusted, ylim[0], ' 2f', color='gray', ha='left', va='bottom')
+        plt.text(xlim[0], 2 * focal_length_adjusted, ' 2f', color='gray', ha='left', va='bottom')
         plt.legend()
         plt.grid(True, alpha=0.3)
         plt.savefig(path + '/f' + str(focal_length) + 'mm_object_positions_comparison.jpg', dpi=1000, bbox_inches='tight')
         plt.close()
+
+
 
         
 

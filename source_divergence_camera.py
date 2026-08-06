@@ -1,5 +1,6 @@
+from matplotlib.patches import Ellipse
 import numpy as np
-from matplotlib import pyplot as plt
+from matplotlib import axes, pyplot as plt
 from pathlib import Path
 import pathlib
 import re
@@ -14,7 +15,7 @@ if __name__ == "__main__":
 
 
     # path to the folder containing .npy files
-    path ="D:\\OneDrive - Wojskowa Akademia Techniczna\\Pomiary\\Łącze THz\\Terasense 90 mW"
+    path ="C:\\Users\\komor\\OneDrive - Wojskowa Akademia Techniczna\\Pomiary\\Łącze THz\\Terasense 90 mW"
 
     
     paths = [f for f in Path(path).glob("*.npy")]
@@ -22,7 +23,7 @@ if __name__ == "__main__":
     print(*paths, sep='\n')
 
     ploting = True
-    plotting_2D_gauss = False
+    plotting_2D_gauss = True
 
     l = 3.21  # mm, wavelength of the beam
     w0 = 7.04  # mm, beam waist radius
@@ -326,14 +327,18 @@ if __name__ == "__main__":
                 
                 plt.figure(figsize=(10, 4))
                 plt.subplot(1, 2, 1)
-                plt.imshow(selected_image_centered, cmap='inferno', aspect='auto', extent=[-80, 80, -80, 80])
+                plt.imshow(selected_image_centered, cmap='inferno', aspect='1', extent=[-80, 80, -80, 80])
+                ellipse = Ellipse((0, 0), 2 * sigma_x_2d, 2 * sigma_y_2d, edgecolor='cyan', facecolor='none', linewidth=1.5)
+                plt.gca().add_patch(ellipse)
                 plt.title('Selected image (centered)')
                 plt.colorbar()
                 plt.xlabel('Pixels')
                 plt.ylabel('Pixels')
 
                 plt.subplot(1, 2, 2)
-                plt.imshow(fitted_image_2d_centered, cmap='inferno', aspect='auto', extent=[-80, 80, -80, 80])
+                plt.imshow(fitted_image_2d_centered, cmap='inferno', aspect='1', extent=[-80, 80, -80, 80])
+                ellipse = Ellipse((0, 0), 2 * sigma_x_2d, 2 * sigma_y_2d, edgecolor='cyan', facecolor='none', linewidth=1.5)
+                plt.gca().add_patch(ellipse)
                 plt.title('2D Gaussian fit (centered)')
                 plt.colorbar()
                 plt.xlabel('Pixels')
@@ -343,7 +348,37 @@ if __name__ == "__main__":
                     f'2D Gaussian fit at distance {selected_distance:.1f} mm, '
                     f'2sigma_x={2*sigma_x_2d:.2f} mm, 2sigma_y={2*sigma_y_2d:.2f} mm'
                 )
+
                 plt.savefig(Path(path) / f'selected_image_2d_gaussian_fit_distance_{selected_distance:.0f}mm.jpg', dpi=1000, bbox_inches='tight')
+                plt.close()
+                
+                # Plot crosssections along 0,0 point
+                plt.figure(figsize=(10, 6))
+                center_idx = center_pixel_range
+                
+                # Horizontal crosssections (y=0)
+                horizontal_selected = selected_image_centered[center_idx, :]
+                horizontal_fitted = fitted_image_2d_centered[center_idx, :]
+                
+                # Vertical crosssections (x=0)
+                vertical_selected = selected_image_centered[:, center_idx]
+                vertical_fitted = fitted_image_2d_centered[:, center_idx]
+                
+                pixel_extent = np.linspace(-center_pixel_range, center_pixel_range, 2 * center_pixel_range)
+                
+                plt.plot(pixel_extent, horizontal_selected, label='Selected (horizontal)', linewidth=2)
+                plt.plot(pixel_extent, horizontal_fitted, label='Fitted (horizontal)', linewidth=2, linestyle='--')
+                plt.plot(pixel_extent, vertical_selected, label='Selected (vertical)', linewidth=2)
+                plt.plot(pixel_extent, vertical_fitted, label='Fitted (vertical)', linewidth=2, linestyle='--')
+                plt.axhline(y=amplitude_2d / np.exp(2), color='black', linestyle=':', linewidth=1)
+                
+                plt.xlabel('Pixels')
+                plt.ylabel('Intensity')
+                plt.title(f'Crosssections through center at distance {selected_distance:.1f} mm')
+                plt.legend()
+                plt.grid(True, alpha=0.3)
+                
+                plt.savefig(Path(path) / f'crosssections_2d_gaussian_fit_distance_{selected_distance:.0f}mm.jpg', dpi=1000, bbox_inches='tight')
                 plt.close()
         
 
@@ -409,9 +444,10 @@ if __name__ == "__main__":
 
         print(f'Fit line x: y = {coeffs[0]:.4f}x + {coeffs[1]:.4f}')
         print(f'Fit angle: {angle_deg:.4f} degrees')
+        print(f'Source positions: {-coeffs[1]/coeffs[0]:.4f}')
 
         sorted_idx = np.argsort(all_dist)
-        plt.plot(all_dist, all_radii_2dx, 'o:', markersize=3, label='2D fit radii (X)')
+        plt.plot(all_dist, all_radii_2dx, 'o:', markersize=3, label='2D fit radii (X - H plane)')
         plt.plot(all_dist[sorted_idx], fit_line(all_dist[sorted_idx]), '--', color='cyan', linewidth=2, label=f'Linear fit, theta={angle_deg:.2f}°')
 
         # fit linear divergence
@@ -421,9 +457,10 @@ if __name__ == "__main__":
 
         print(f'Fit line y: y = {coeffs[0]:.4f}x + {coeffs[1]:.4f}')
         print(f'Fit angle: {angle_deg:.4f} degrees')
+        print(f'Source positions: {-coeffs[1]/coeffs[0]:.4f}')
 
         sorted_idx = np.argsort(all_dist)
-        plt.plot(all_dist, all_radii_2dy, 'o:', markersize=3, label='2D fit radii (Y)')
+        plt.plot(all_dist, all_radii_2dy, 'o:', markersize=3, label='2D fit radii (Y - E plane)')
         plt.plot(all_dist[sorted_idx], fit_line(all_dist[sorted_idx]), '--', color='magenta', linewidth=2, label=f'Linear fit, theta={angle_deg:.2f}°')
         
 
