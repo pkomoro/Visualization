@@ -66,7 +66,7 @@ if __name__ == "__main__":
     lens_thickness = 2  # mm, thickness of the lens
 
     # focal_length = 118  # mm, adjust based on your lens
-    for focal_length in [118]:  # mm, focal lengths of the lenses used in the experiment
+    for focal_length in [180]:  # mm, focal lengths of the lenses used in the experiment
 
         
         # source_distance_shift = 8.5

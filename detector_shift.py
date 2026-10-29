@@ -60,13 +60,61 @@ for group in range(3):
 			measured_power = measured_power[valid]
 			nearest = distance.idxmin()
 			theory_distance = sorted(distance.unique())[20::]
-			directional_gain = 200  # Assuming isotropic antennas
-			initial_power = 50
+			directional_gain_log = 25  # dBi
+			directional_gain = 10 ** (directional_gain_log / 10)  # Convert dBi to linear scale
+			initial_power = 100
 			wavelength = 3.12  # Assuming a frequency of 96.2 GHz
 			theory_power = free_space_loss(theory_distance, initial_power, wavelength, directional_gain, directional_gain)
 			
-			ax.plot(theory_distance, theory_power, linestyle="--", label="Free-space loss (1/d²) \nwith directional gain \nTx = Rx = 23dB", color="orange")
+			ax.plot(theory_distance, theory_power, linestyle="--", 
+			        label=f"Free-space loss (1/d²) \nwith directional gain \nTx = Rx = {directional_gain_log} dBi", color="orange")
+			
+			directional_gain_log = 22  # dBi
+			directional_gain = 10 ** (directional_gain_log / 10)  # Convert dBi to linear scale
+			initial_power = 100
+			wavelength = 3.12  # Assuming a frequency of 96.2 GHz
+			theory_power = free_space_loss(theory_distance, initial_power, wavelength, directional_gain, directional_gain)
+			ax.plot(theory_distance, theory_power, linestyle="--", 
+                    label=f"Free-space loss (1/d²) \nwith directional gain \nTx = Rx = {directional_gain_log} dBi", color="red")
 			ax.legend()
+
+			aperture = 20  # Aperture size in mm
+			far_field = 2 * (aperture) ** 2 / wavelength  # Far-field distance calculation
+			
+			ax.text(
+				0.55,
+				0.62,
+				"Far field for d = " + f"{aperture} mm:  {far_field:.3g} mm",
+				transform=ax.transAxes,
+				va="top",
+				bbox={"facecolor": "white", "alpha": 0.8, "edgecolor": "grey", "boxstyle": "round"},
+			)
+			
+			aperture = 15  # Aperture size in mm
+			far_field = 2 * (aperture) ** 2 / wavelength  # Far-field distance calculation
+	
+			ax.text(
+				0.55,
+				0.55,
+				"Far field for d = " + f"{aperture} mm:  {far_field:.3g} mm",
+				transform=ax.transAxes,
+				va="top",
+				bbox={"facecolor": "white", "alpha": 0.8, "edgecolor": "grey", "boxstyle": "round"},
+			)
+
+			aperture = 10  # Aperture size in mm
+			far_field = 2 * (aperture) ** 2 / wavelength  # Far-field distance calculation
+			
+			ax.text(
+				0.55,
+				0.48,
+				"Far field for d = " + f"{aperture} mm:  {far_field:.2g} mm",
+				transform=ax.transAxes,
+				va="top",
+				bbox={"facecolor": "white", "alpha": 0.8, "edgecolor": "grey", "boxstyle": "round"},
+			)
+
+			
 	fig.tight_layout()
 
     
