@@ -15,10 +15,12 @@ if __name__ == "__main__":
 
 
     # path to the folder containing .npy files
-    path ="C:\\Users\\komor\\OneDrive - Wojskowa Akademia Techniczna\\Pomiary\\Łącze THz\\Terasense 90 mW"
+    path ="C:\\Users\\komor\\OneDrive - Wojskowa Akademia Techniczna\\Pomiary\\Łącze THz\\Terasense 90 mW - porównanie anten"
 
+    name = "withLens"
+    paths = [f for f in Path(path).glob(f"**/*{name}*.npy")]
+    paths.reverse()
     
-    paths = [f for f in Path(path).glob("*.npy")]
 
     print(*paths, sep='\n')
 
@@ -29,7 +31,8 @@ if __name__ == "__main__":
     w0 = 7.04  # mm, beam waist radius
     
 
-    paths_meta = [f for f in Path(path).glob("*.meta")]
+    paths_meta = [f for f in Path(path).glob(f"**/*{name}*.meta")]
+    paths_meta.reverse()
     
     data = paths.copy()
 
@@ -107,8 +110,10 @@ if __name__ == "__main__":
         index = data_meta_copy[j].find("mm")
         z_stop = float(data_meta_copy[j][:(index-1)])
 
-        z0 = 175
-        
+        # z0 = 175
+        z0 = 0
+
+        print(f"Processing {paths[j]} with pixel size {pixel_size} mm, exposure {exposure}, z0 {z0}, z_start {z_start}, z_stop {z_stop}, y_start {y_start}, y_stop {y_stop}")
 
         image = np.swapaxes(data[j], 0, 2)
         image = np.flip(image,2)
@@ -156,8 +161,8 @@ if __name__ == "__main__":
 
         plt.text(sorted_distances[-5], fit_line(sorted_distances[-5]), '$1/e^2$ diameter', va='bottom', ha='right', fontsize=11, color='cyan')
 
-        plt.savefig(Path(path) / 'divergence_plot.jpg', dpi=1000, bbox_inches='tight')
-        plt.savefig(Path(path) / 'divergence_plot.svg', bbox_inches='tight')
+        plt.savefig(Path(path) / f'{name}_divergence_plot.jpg', dpi=1000, bbox_inches='tight')
+        plt.savefig(Path(path) / f'{name}_divergence_plot.svg', bbox_inches='tight')
         plt.close()
 
     if ploting:
@@ -187,10 +192,10 @@ if __name__ == "__main__":
         plt.title('Divergence of the beam')
         plt.legend()
         plt.grid(True, alpha=0.3)
-        plt.savefig(Path(path) / 'combined_divergence_plot.jpg', dpi=1000, bbox_inches='tight')
+        plt.savefig(Path(path) / f'{name}_combined_divergence_plot.jpg', dpi=1000, bbox_inches='tight')
         plt.close()
 
-        for selected_j, selected_k in [(0, 1), (1, 0), (1, 28)]:
+        for selected_j, selected_k in [(0, 1), (1, 0), (2, 0)]:
             selected_image = data[selected_j][selected_k]
 
             data_meta_copy = data_meta.copy()
@@ -261,7 +266,7 @@ if __name__ == "__main__":
             plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=1)
             plt.subplots_adjust(bottom=0.25)
             plt.grid(True, alpha=0.3)
-            plt.savefig(Path(path) / f'cross_section_gaussian_fit_distance_{selected_distance:.0f}mm.jpg', dpi=1000, bbox_inches='tight')
+            plt.savefig(Path(path) / f'{name}_cross_section_gaussian_fit_distance_{selected_distance:.0f}mm.jpg', dpi=1000, bbox_inches='tight')
             plt.close()
 
             if plotting_2D_gauss:
@@ -349,7 +354,7 @@ if __name__ == "__main__":
                     f'2sigma_x={2*sigma_x_2d:.2f} mm, 2sigma_y={2*sigma_y_2d:.2f} mm'
                 )
 
-                plt.savefig(Path(path) / f'selected_image_2d_gaussian_fit_distance_{selected_distance:.0f}mm.jpg', dpi=1000, bbox_inches='tight')
+                plt.savefig(Path(path) / f'{name}_selected_image_2d_gaussian_fit_distance_{selected_distance:.0f}mm.jpg', dpi=1000, bbox_inches='tight')
                 plt.close()
                 
                 # Plot crosssections along 0,0 point
@@ -378,7 +383,7 @@ if __name__ == "__main__":
                 plt.legend()
                 plt.grid(True, alpha=0.3)
                 
-                plt.savefig(Path(path) / f'crosssections_2d_gaussian_fit_distance_{selected_distance:.0f}mm.jpg', dpi=1000, bbox_inches='tight')
+                plt.savefig(Path(path) / f'{name}_crosssections_2d_gaussian_fit_distance_{selected_distance:.0f}mm.jpg', dpi=1000, bbox_inches='tight')
                 plt.close()
         
 
@@ -464,15 +469,15 @@ if __name__ == "__main__":
         plt.plot(all_dist[sorted_idx], fit_line(all_dist[sorted_idx]), '--', color='magenta', linewidth=2, label=f'Linear fit, theta={angle_deg:.2f}°')
         
 
-        for z_vert in (185, 325, 465):
-            plt.axvline(x=z_vert, color='black', linestyle=':', linewidth=1)
+        # for z_vert in (185, 325, 465):
+        #     plt.axvline(x=z_vert, color='black', linestyle=':', linewidth=1)
         
         plt.xlabel('Distance (mm)')
-        plt.ylabel('1/e^2 diameter (mm)')
-        plt.title('Divergence from 2D Gaussian fits')
+        plt.ylabel(r'1/e$^2$ diameter (mm)')
+        plt.title('Divergence from 2D Gaussian fits for: ' + name)
         plt.legend()
         plt.grid(True, alpha=0.3)
-        plt.savefig(Path(path) / 'divergence_2d_fits_plot.jpg', dpi=1000, bbox_inches='tight')
+        plt.savefig(Path(path) / f'{name}_divergence_2d_fits_plot.jpg', dpi=1000, bbox_inches='tight')
         plt.close()
 
 
